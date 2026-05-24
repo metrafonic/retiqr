@@ -6,7 +6,7 @@ retiqr fixes that. Navigate to the retiqr website on the kiosk browser — it re
 
 Typical throughput: ~3 kB/s down (QR), ~500 B/s up (HID). Enough for messaging and Nomad Network.
 
-> **Experimental:** A WebHID fast path is available on Chrome/Edge when the dongle is plugged in, lifting throughput to tens of KiB/s. See each component's README for details.
+> **Experimental:** A WebHID fast path (thanks [@KenAKAFrosty](https://github.com/KenAKAFrosty)) is available on Chrome/Edge when the dongle is plugged in, lifting throughput to tens of KiB/s. See each component's README for details.
 
 [![Client app in action](docs/demo.png)](docs/demo.png)
 
@@ -51,6 +51,10 @@ Typical throughput: ~3 kB/s down (QR), ~500 B/s up (HID). Enough for messaging a
 \* Experimental. Hardware-verified on an ESP32-S3 AtomS3 Lite.
 
 The Pi Zero gadget path (`--uplink gadget`) is implemented but has not been tested on hardware. Contributions welcome.
+
+## Thanks
+
+[@KenAKAFrosty](https://github.com/KenAKAFrosty) — WebHID fast-path implementation.
 
 ## AI disclosure
 
