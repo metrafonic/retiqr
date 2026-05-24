@@ -35,23 +35,25 @@ log = logging.getLogger(__name__)
 class KioskApp:
     """Thin wrapper — instantiate, call run()."""
 
-    def __init__(self, bridge_port: int = 4243, camera_device: int = 0, uplink=None):
+    def __init__(self, bridge_port: int = 4243, camera_device: int = 0, uplink=None,
+                 mode: str = "legacy"):
         self._bridge_port = bridge_port
         self._camera_device = camera_device
         self._uplink = uplink
+        self._mode = mode  # "legacy" (the standard camera+keyboard path) or "webhid" (vendor HID)
 
     def run(self):
         import sys
         from PySide6.QtWidgets import QApplication
 
         app = QApplication(sys.argv)
-        window = _MainWindow(self._bridge_port, self._camera_device, self._uplink)
+        window = _MainWindow(self._bridge_port, self._camera_device, self._uplink, self._mode)
         window.show()
         sys.exit(app.exec())
 
 
 class _MainWindow:
-    def __init__(self, bridge_port: int, camera_device: int, uplink=None):
+    def __init__(self, bridge_port: int, camera_device: int, uplink=None, mode: str = "legacy"):
         from PySide6.QtCore import Qt, QTimer
         from PySide6.QtGui import QImage, QPixmap
         from PySide6.QtWidgets import (
@@ -61,6 +63,7 @@ class _MainWindow:
         self._QImage = QImage
         self._QPixmap = QPixmap
         self._Qt = Qt
+        self._mode = mode
 
         self._win = QMainWindow()
         self._win.setWindowTitle("Reticulum Kiosk Bridge")
@@ -71,7 +74,7 @@ class _MainWindow:
         layout.setContentsMargins(0, 0, 0, 0)
         self._win.setCentralWidget(central)
 
-        self._view = QLabel("no camera")
+        self._view = QLabel("no camera" if mode == "legacy" else "Fast path (WebHID)")
         self._view.setAlignment(Qt.AlignCenter)
         self._view.setStyleSheet("background: #111; color: #555;")
         from PySide6.QtGui import QFontDatabase
@@ -88,6 +91,19 @@ class _MainWindow:
         self._up_info  = QLabel("TX: —")
         self._up_info.setStyleSheet("color: #888;")
 
+        from PySide6.QtWidgets import QComboBox
+        self._mode_combo = QComboBox()
+        self._mode_combo.addItem("Standard", "legacy")
+        self._mode_combo.addItem("⚗ WebHID", "webhid")
+        self._mode_combo.setCurrentIndex(0 if mode == "legacy" else 1)
+        self._mode_combo.setToolTip("Switch transport mode (Standard: QR+keyboard · WebHID: direct vendor HID via BLE/Wi-Fi)")
+        self._mode_combo.setStyleSheet(
+            "QComboBox { background:#1e1e1e; color:#888; border:1px solid #333;"
+            " padding:0 6px; font-size:11px; }"
+            "QComboBox::drop-down { border:none; }"
+        )
+        self._mode_combo.activated.connect(self._on_mode_combo_changed)
+
         conn_bar = QWidget()
         conn_bar.setFixedHeight(28)
         conn_bar.setStyleSheet("background: #1a1a1a;")
@@ -100,6 +116,7 @@ class _MainWindow:
         bar_layout.addWidget(self._up_dot)
         bar_layout.addWidget(self._up_info)
         bar_layout.addStretch()
+        bar_layout.addWidget(self._mode_combo)
         layout.addWidget(conn_bar)
         layout.addWidget(self._view)
 
@@ -136,30 +153,114 @@ class _MainWindow:
         self._timer.start()
 
         self._start_bridge(bridge_port, uplink)
-        self._start_camera(camera_device)
+        if self._mode == "legacy":
+            self._start_camera(camera_device)
+        else:
+            log.info("webhid mode: skipping camera startup")
+            self._camera = None
 
     def show(self):
         self._win.show()
+
+    # ── mode switching ────────────────────────────────────────────────────────
+
+    def _on_mode_combo_changed(self, index: int):
+        new_mode = self._mode_combo.itemData(index)
+        if new_mode != self._mode:
+            self._apply_mode_switch(new_mode)
+
+    def _apply_mode_switch(self, new_mode: str):
+        from framing import hid_encode, hid_report_chunks
+
+        old_mode = self._mode
+        self._mode = new_mode
+        log.info("Mode switch: %s → %s", old_mode, new_mode)
+
+        if new_mode == "webhid":
+            # Stop camera if running
+            if self._camera:
+                self._camera.stop()
+                self._camera = None
+            self._view.setText("⚗ WebHID (Experimental)")
+
+            # Swap bridge callbacks to raw-splice path
+            def on_tx_raw(chunk: bytes):
+                if not chunk:
+                    return
+                reports = hid_report_chunks(chunk)
+                if reports:
+                    self._tx_count += 1
+                    self._ble.send_raw(b"".join(reports))
+            self._bridge.on_tx_packet = None
+            self._bridge.on_tx_raw = on_tx_raw
+
+            # Wire BLE inbound path
+            def on_rx_raw(stream: bytes):
+                self._rx_count += 1
+                if self._bridge:
+                    self._bridge.put_rx_raw(stream)
+            self._ble.on_rx_raw = on_rx_raw
+
+        else:  # legacy
+            # Tear down WebHID callbacks first
+            self._bridge.on_tx_raw = None
+            self._ble.on_rx_raw = None
+
+            def on_tx_packet(pkt: bytes):
+                self._tx_count += 1
+                self._ble.send(hid_encode(pkt).encode())
+            self._bridge.on_tx_packet = on_tx_packet
+
+            # Restart camera (macOS: must probe from Qt main thread)
+            self._view.clear()
+            self._start_camera(self._camera_device)
+
+        # Keep combo in sync (in case called programmatically)
+        target_idx = 0 if new_mode == "legacy" else 1
+        if self._mode_combo.currentIndex() != target_idx:
+            self._mode_combo.blockSignals(True)
+            self._mode_combo.setCurrentIndex(target_idx)
+            self._mode_combo.blockSignals(False)
 
     # ── bridge ────────────────────────────────────────────────────────────────
 
     def _start_bridge(self, port: int, uplink=None):
         from bridge import Bridge
-        from framing import hid_encode
+        from framing import hid_encode, hid_report_chunks
         from tx.ble import NullUplink
 
         self._ble = uplink if uplink is not None else NullUplink()
         self._bridge = Bridge(port=port)
 
-        def on_tx(pkt: bytes):
-            self._tx_count += 1
-            self._ble.send(hid_encode(pkt).encode())
+        if self._mode == "legacy":
+            # Legacy: decoded packets -> ">HEX<CC<" frames -> typed keystrokes
+            def on_tx_packet(pkt: bytes):
+                self._tx_count += 1
+                self._ble.send(hid_encode(pkt).encode())
+            self._bridge.on_tx_packet = on_tx_packet
+        else:
+            # Fast path: raw HDLC byte stream -> fixed-size vendor HID report bodies -> vendor HID
+            def on_tx_raw(chunk: bytes):
+                if not chunk:
+                    return
+                reports = hid_report_chunks(chunk)
+                if reports:
+                    self._tx_count += 1
+                    self._ble.send_raw(b"".join(reports))
+            self._bridge.on_tx_raw = on_tx_raw
 
-        self._bridge.on_tx_packet = on_tx
+            # And the inbound direction: BLE WHID-RX notifications -> bridge
+            # -> straight onto the Reticulum socket (already HDLC-framed).
+            def on_rx_raw(stream: bytes):
+                self._rx_count += 1
+                if self._bridge:
+                    self._bridge.put_rx_raw(stream)
+            self._ble.on_rx_raw = on_rx_raw
 
         def _run():
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
+            self._bridge_loop = loop
             try:
                 loop.run_until_complete(
                     asyncio.gather(self._bridge.serve_forever(), self._ble.run())
@@ -168,6 +269,7 @@ class _MainWindow:
                 log.error("Bridge failed: %s", exc)
                 self._bridge_error = str(exc)
 
+        self._bridge_loop = None
         self._bridge_error = None
         threading.Thread(target=_run, daemon=True, name="bridge").start()
 

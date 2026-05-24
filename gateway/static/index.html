@@ -7,161 +7,363 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    body {
-      background: #0a0a0a;
-      color: #ccc;
-      font: 12px/1.4 monospace;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      overflow: hidden;
-      user-select: none;
+    :root {
+      --bg0: #08090e;
+      --bg1: #0c0e17;
+      --bg2: #10131e;
+      --bg3: #151a28;
+      --bg4: #1b2133;
+      --bd0: #181d2e;
+      --bd1: #202843;
+      --bd2: #2b3655;
+      --t0:  #dde3f5;
+      --t1:  #8c9dc2;
+      --t2:  #505e82;
+      --t3:  #2a3350;
+      --grn:      #28de78;
+      --grn-glow: rgba(40, 222, 120, .32);
+      --grn-bg:   rgba(40, 222, 120, .07);
+      --amb:      #f0aa34;
+      --amb-bg:   rgba(240, 170, 52, .08);
+      --blu:      #4a9eff;
+      --red:      #e05252;
+      --red-glow: rgba(224, 82, 82, .28);
+      --f: 'SF Mono', 'JetBrains Mono', 'Fira Code', Consolas, 'Courier New', monospace;
     }
 
+    body {
+      background: var(--bg0);
+      color: var(--t0);
+      font: 12px/1.5 var(--f);
+      display: flex; flex-direction: column;
+      height: 100vh; overflow: hidden;
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── STATUS BAR ─────────────────────────────────────────── */
     #status-bar {
-      display: flex;
-      gap: 20px;
-      align-items: center;
-      padding: 6px 14px;
-      background: #161616;
-      border-bottom: 1px solid #222;
+      height: 38px;
+      display: flex; align-items: center;
+      padding: 0 14px; gap: 4px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--bd0);
       flex-shrink: 0;
     }
 
-    .indicator {
-      display: flex;
-      align-items: center;
-      gap: 6px;
+    .sb-sep {
+      width: 1px; height: 16px;
+      background: var(--bd0);
+      margin: 0 8px; flex-shrink: 0;
     }
+
+    .indicator { display: flex; align-items: center; gap: 7px; }
+    .indicator > span { font-size: 11px; color: var(--t1); }
 
     .dot {
-      width: 7px; height: 7px;
-      border-radius: 50%;
-      background: #444;
-      transition: background 0.3s;
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--t3);
+      transition: background .3s, box-shadow .3s;
+      flex-shrink: 0;
     }
-    .dot.on  { background: #4c4; }
-    .dot.err { background: #c44; }
+    .dot.on  { background: var(--grn); box-shadow: 0 0 6px var(--grn-glow); }
+    .dot.err { background: var(--red); box-shadow: 0 0 5px var(--red-glow); }
 
-    #main {
-      flex: 1;
-      display: flex;
-      overflow: hidden;
+    .sb-ctr {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 11px;
+    }
+    .sb-ctr .lbl { color: var(--t2); }
+    .sb-ctr .val { color: var(--t0); font-variant-numeric: tabular-nums; min-width: 18px; }
+
+    #fast-btn {
+      background: transparent;
+      border: 1px solid var(--bd1);
+      color: var(--t2); padding: 3px 11px;
+      font: 11px/1 var(--f);
+      letter-spacing: .06em; border-radius: 3px;
+      cursor: not-allowed; opacity: .35;
+      transition: border-color .25s, color .25s, opacity .25s, background .15s, box-shadow .25s;
+    }
+    #fast-btn.available {
+      border-color: var(--amb); color: var(--amb);
+      cursor: pointer; opacity: 1;
+      animation: amb-pulse 2.5s ease-in-out infinite;
+    }
+    #fast-btn.available:hover { background: var(--amb-bg); animation: none; }
+    #fast-btn.active {
+      border-color: var(--grn); color: var(--grn);
+      animation: none; opacity: 1; cursor: pointer;
+    }
+    #fast-btn.active:hover { background: var(--grn-bg); }
+    @keyframes amb-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 transparent; }
+      50%       { box-shadow: 0 0 0 3px rgba(240, 170, 52, .2); }
     }
 
+    #seq-disp {
+      margin-left: auto;
+      font-size: 10px; letter-spacing: .07em; color: var(--t2);
+    }
+
+    /* ─── MAIN LAYOUT ────────────────────────────────────────── */
+    #main { flex: 1; display: flex; overflow: hidden; }
+
+    /* ─── QR AREA ────────────────────────────────────────────── */
     #qr-area {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      cursor: default;
+      flex: 1; position: relative;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--bg0);
     }
+
+    /* viewfinder corner brackets */
+    .qr-corn {
+      position: absolute;
+      width: 22px; height: 22px;
+      border-color: var(--bd2); border-style: solid;
+      pointer-events: none; z-index: 1;
+    }
+    .qr-corn.tl { top: 14px; left: 14px;    border-width: 1px 0 0 1px; }
+    .qr-corn.tr { top: 14px; right: 14px;   border-width: 1px 1px 0 0; }
+    .qr-corn.bl { bottom: 14px; left: 14px;  border-width: 0 0 1px 1px; }
+    .qr-corn.br { bottom: 14px; right: 14px; border-width: 0 1px 1px 0; }
 
     #qr-canvas {
       image-rendering: pixelated;
       image-rendering: crisp-edges;
-      max-width: 100%;
-      max-height: 100%;
+      max-width: 100%; max-height: 100%;
     }
 
     #idle-msg {
       position: absolute;
-      color: #333;
-      font-size: 14px;
-      text-align: center;
-      pointer-events: none;
+      color: var(--t3); font-size: 11px;
+      letter-spacing: .08em;
+      text-align: center; pointer-events: none;
     }
 
-    /* ── sidebar ── */
+    #webhid-invite {
+      position: absolute; bottom: 14px;
+      left: 50%; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 9px;
+      font-size: 10px; color: var(--t1);
+      background: rgba(12, 14, 23, .94);
+      border: 1px solid var(--bd0);
+      padding: 5px 14px; white-space: nowrap;
+      pointer-events: none; letter-spacing: .03em;
+      border-radius: 3px;
+    }
+    #webhid-invite[hidden] { display: none !important; }
+
+    /* ─── WEBHID PANEL ───────────────────────────────────────── */
+    #webhid-area {
+      position: absolute; inset: 0;
+      display: none; flex-direction: column;
+      background: var(--bg0); overflow-y: auto;
+    }
+    #webhid-area.active { display: flex; }
+
+    #webhid-header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 11px 18px;
+      border-bottom: 1px solid var(--bd0);
+      flex-shrink: 0; background: var(--bg2);
+    }
+
+    .exp-badge {
+      display: inline-flex; align-items: center;
+      background: var(--amb-bg);
+      border: 1px solid rgba(240, 170, 52, .22);
+      color: var(--amb);
+      font-size: 9px; letter-spacing: .16em;
+      padding: 2px 7px; border-radius: 2px; flex-shrink: 0;
+    }
+
+    #webhid-header-title {
+      font-size: 12px; letter-spacing: .08em; color: var(--t1);
+    }
+
+    #webhid-device {
+      flex: 1; color: var(--grn); font-size: 11px;
+      min-width: 0; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    #webhid-exit-btn {
+      background: transparent; border: 1px solid var(--bd1);
+      color: var(--t1); padding: 4px 11px;
+      font: 11px/1 var(--f); cursor: pointer;
+      border-radius: 3px; letter-spacing: .05em; flex-shrink: 0;
+      transition: background .15s, border-color .2s, color .2s;
+    }
+    #webhid-exit-btn:hover {
+      border-color: var(--bd2); color: var(--t0); background: var(--bg3);
+    }
+
+    #webhid-content {
+      flex: 1; padding: 16px 18px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+
+    #webhid-top-row {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    }
+    @media (max-width: 520px) { #webhid-top-row { grid-template-columns: 1fr; } }
+
+    .webhid-card {
+      border: 1px solid var(--bd0);
+      padding: 12px 14px;
+      background: var(--bg2); border-radius: 3px;
+    }
+
+    .card-label {
+      font-size: 9px; letter-spacing: .16em;
+      color: var(--t2); text-transform: uppercase; margin-bottom: 10px;
+    }
+
+    /* stats grid — innerHTML driven by updateFastStats() */
+    #webhid-stats {
+      display: grid;
+      grid-template-columns: 72px 1fr 1fr;
+      gap: 5px 12px; font-size: 11px;
+    }
+    .sg-l { color: var(--t2); }
+    .sg-v { color: var(--t1); font-variant-numeric: tabular-nums; }
+    .sg-v.hi { color: var(--grn); }
+
+    /* peer-config form */
+    #webhid-controls { display: flex; flex-direction: column; gap: 8px; }
+    #webhid-controls .row { display: flex; align-items: center; gap: 8px; }
+    #webhid-controls label {
+      display: flex; flex-direction: column; gap: 4px; flex: 1;
+      color: var(--t1); font-size: 10px; letter-spacing: .04em;
+    }
+    #webhid-controls select,
+    #webhid-controls input[type="text"],
+    #webhid-controls input[type="password"] {
+      width: 100%; background: var(--bg3); border: 1px solid var(--bd1);
+      color: var(--t0); padding: 5px 8px;
+      font: 11px var(--f); border-radius: 3px;
+      outline: none; -webkit-appearance: none;
+      transition: border-color .15s;
+    }
+    #webhid-controls select:focus,
+    #webhid-controls input:focus { border-color: var(--bd2); }
+    #webhid-controls button {
+      background: transparent; border: 1px solid var(--bd1);
+      color: var(--t1); padding: 5px 10px;
+      font: 11px var(--f); cursor: pointer; border-radius: 3px;
+      transition: background .15s, border-color .15s, color .15s;
+    }
+    #webhid-controls button:hover {
+      background: var(--bg4); border-color: var(--bd2); color: var(--t0);
+    }
+    #webhid-controls button:disabled { opacity: .3; cursor: default; }
+    .input-with-action { display: flex; gap: 6px; align-items: stretch; }
+    .input-with-action input  { flex: 1; }
+    .input-with-action button { flex-shrink: 0; min-width: 52px; }
+    .wifi-only[hidden] { display: none !important; }
+    #webhid-config-status {
+      font-size: 10px; color: var(--t1);
+      min-height: 1.4em; letter-spacing: .03em;
+    }
+
+    /* guide accordion */
+    #webhid-guide {
+      border: 1px solid var(--bd0);
+      background: var(--bg2); border-radius: 3px;
+    }
+    #webhid-guide summary {
+      cursor: pointer; padding: 9px 14px;
+      font-size: 9px; letter-spacing: .16em; color: var(--t2);
+      text-transform: uppercase; user-select: none; list-style: none;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    #webhid-guide summary::-webkit-details-marker { display: none; }
+    #webhid-guide summary::after { content: '▸'; font-size: 9px; }
+    #webhid-guide[open] summary::after { content: '▾'; }
+    #webhid-guide[open] summary { color: var(--t1); border-bottom: 1px solid var(--bd0); }
+
+    .guide-body {
+      padding: 14px 16px; font-size: 11px;
+      color: var(--t1); line-height: 1.85;
+    }
+    .guide-h {
+      color: var(--t1); font-size: 9px; letter-spacing: .14em;
+      text-transform: uppercase;
+      margin: 12px 0 5px; padding-bottom: 4px;
+      border-bottom: 1px solid var(--bd0);
+    }
+    .guide-h:first-child { margin-top: 0; }
+    .guide-step { display: flex; gap: 9px; margin-bottom: 2px; }
+    .guide-n {
+      color: var(--grn); opacity: .45;
+      flex-shrink: 0; min-width: 22px; font-size: 10px;
+    }
+    .guide-warn {
+      margin-top: 12px; font-size: 10px;
+      color: rgba(240, 170, 52, .65);
+      border-left: 2px solid rgba(240, 170, 52, .25);
+      padding-left: 10px;
+    }
+    code {
+      background: var(--bg3); border: 1px solid var(--bd0);
+      padding: 0 5px; color: var(--grn);
+      font: inherit; border-radius: 2px;
+    }
+
+    /* ─── SIDEBAR ────────────────────────────────────────────── */
     #sidebar {
-      width: 160px;
-      flex-shrink: 0;
-      border-left: 1px solid #1e1e1e;
-      display: flex;
-      flex-direction: column;
-      background: #0e0e0e;
+      width: 164px; flex-shrink: 0;
+      border-left: 1px solid var(--bd0);
+      display: flex; flex-direction: column;
+      background: var(--bg1);
     }
 
     #rx-panel {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-end;
-      overflow: hidden;
+      flex: 1; display: flex;
+      flex-direction: column; justify-content: flex-end; overflow: hidden;
     }
 
     #sidebar-label {
-      display: flex;
-      justify-content: space-between;
-      padding: 5px 8px;
-      font-size: 10px;
-      letter-spacing: 0.08em;
-      color: #444;
-      border-top: 1px solid #1e1e1e;
-      border-bottom: 1px solid #1e1e1e;
-      flex-shrink: 0;
+      display: flex; justify-content: space-between;
+      padding: 5px 10px;
+      font-size: 9px; letter-spacing: .12em; color: var(--t2);
+      border-top: 1px solid var(--bd0); border-bottom: 1px solid var(--bd0);
+      text-transform: uppercase; flex-shrink: 0;
+      background: var(--bg2);
     }
 
     #tx-panel {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-start;
-      overflow: hidden;
+      flex: 1; display: flex;
+      flex-direction: column; justify-content: flex-start; overflow: hidden;
     }
 
     .stream-events {
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      padding: 4px 0;
+      overflow: hidden; display: flex; flex-direction: column; padding: 3px 0;
     }
+    #rx-events { justify-content: flex-end; }
 
     .stream-event {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      padding: 2px 8px;
-      opacity: 1;
-      transition: opacity 2s ease;
+      display: flex; align-items: center; gap: 6px; padding: 2px 8px;
     }
-
 
     .event-bar-bg {
-      flex: 1;
-      height: 6px;
-      background: #1a1a1a;
-      border-radius: 2px;
-      overflow: hidden;
+      flex: 1; height: 4px;
+      background: var(--bg3); border-radius: 2px; overflow: hidden;
     }
-
-    .event-bar {
-      height: 100%;
-      border-radius: 2px;
-      min-width: 2px;
-    }
-
-    .rx-bar  { background: #2a6; }
-    .tx-bar  { background: #26a; }
+    .event-bar { height: 100%; border-radius: 2px; min-width: 2px; }
+    .rx-bar { background: var(--grn); }
+    .tx-bar { background: var(--blu); }
 
     .event-size {
-      font-size: 9px;
-      color: #444;
-      width: 30px;
-      text-align: right;
-      flex-shrink: 0;
+      font-size: 9px; color: var(--t2);
+      width: 30px; text-align: right; flex-shrink: 0;
     }
 
-    /* Invisible but focusable input — positioned off-screen rather than
-       display:none so kiosk browsers still allow focus */
+    /* ─── HID INPUT SINK ─────────────────────────────────────── */
     #hid-input {
-      position: fixed;
-      left: -9999px;
-      top: 0;
-      width: 1px;
-      height: 1px;
-      opacity: 0;
+      position: fixed; left: -9999px; top: 0;
+      width: 1px; height: 1px; opacity: 0;
     }
   </style>
 </head>
@@ -172,22 +374,136 @@
     <div class="dot" id="ws-dot"></div>
     <span id="ws-text">connecting</span>
   </div>
-  <div class="indicator">
+  <div class="sb-sep"></div>
+  <div class="sb-ctr">
     <div class="dot" id="rx-dot"></div>
-    <span>RX <span id="rx-count">0</span></span>
+    <span class="lbl">RX</span>
+    <span class="val" id="rx-count">0</span>
   </div>
-  <div class="indicator">
+  <div class="sb-ctr">
     <div class="dot" id="tx-dot"></div>
-    <span>TX <span id="tx-count">0</span></span>
+    <span class="lbl">TX</span>
+    <span class="val" id="tx-count">0</span>
   </div>
-  <span>queue <span id="queue-len">0</span></span>
-  <span style="margin-left:auto; color:#555" id="seq-disp">seq —</span>
+  <div class="sb-ctr">
+    <span class="lbl">queue</span>
+    <span class="val" id="queue-len">0</span>
+  </div>
+  <div class="sb-sep"></div>
+  <button id="fast-btn" type="button"
+    title="Requires Chrome, Edge, or Opera on a secure context (HTTPS / localhost). Plug in the KioskDongle then click to enable direct USB HID transport."
+    disabled>WebHID</button>
+  <span id="seq-disp">seq —</span>
 </div>
 
 <div id="main">
   <div id="qr-area">
+    <div class="qr-corn tl"></div>
+    <div class="qr-corn tr"></div>
+    <div class="qr-corn bl"></div>
+    <div class="qr-corn br"></div>
     <canvas id="qr-canvas"></canvas>
-    <div id="idle-msg">waiting for data…</div>
+    <div id="idle-msg">waiting for data&#8230;</div>
+
+    <div id="webhid-invite" hidden>
+      <span class="exp-badge">EXPERIMENTAL</span>
+      WebHID available &#8212; click <b>Enable WebHID Mode</b> in the status bar
+    </div>
+
+    <div id="webhid-area">
+
+      <div id="webhid-header">
+        <span class="exp-badge">EXPERIMENTAL</span>
+        <span id="webhid-header-title">WebHID Direct Mode</span>
+        <div id="webhid-device">&#8212;</div>
+        <button id="webhid-exit-btn" type="button">&#8592; Standard</button>
+      </div>
+
+      <div id="webhid-content">
+
+        <div id="webhid-top-row">
+
+          <div class="webhid-card">
+            <div class="card-label">Throughput</div>
+            <div id="webhid-stats">&#8212;</div>
+          </div>
+
+          <div class="webhid-card">
+            <div class="card-label">Peer Link</div>
+            <div id="webhid-controls">
+              <div class="row">
+                <label>Mode
+                  <select id="peer-mode-select">
+                    <option value="ble">BLE</option>
+                    <option value="wifi-ap">Wi-Fi AP</option>
+                  </select>
+                </label>
+              </div>
+              <div class="row wifi-only" id="wifi-ssid-row" hidden>
+                <label>SSID
+                  <input id="wifi-ssid-input" type="text" maxlength="32"
+                         autocomplete="off" spellcheck="false">
+                </label>
+              </div>
+              <div class="row wifi-only" id="wifi-pass-row" hidden>
+                <label>Password
+                  <div class="input-with-action">
+                    <input id="wifi-pass-input" type="password" maxlength="63"
+                           autocomplete="off" spellcheck="false">
+                    <button id="wifi-pass-toggle" type="button"
+                            aria-pressed="false">Show</button>
+                  </div>
+                </label>
+              </div>
+              <div class="row">
+                <button id="peer-apply-btn" type="button">Apply + Reboot</button>
+              </div>
+              <div id="webhid-config-status">&#8212;</div>
+            </div>
+          </div>
+
+        </div>
+
+        <details id="webhid-guide">
+          <summary>Setup &amp; Test Guide</summary>
+          <div class="guide-body">
+
+            <div class="guide-h">Prerequisites</div>
+            <div class="guide-step"><span class="guide-n">&#183;</span><span>Chrome, Edge, or Opera &#8212; Firefox and Safari do not support WebHID</span></div>
+            <div class="guide-step"><span class="guide-n">&#183;</span><span>Page must be on <code>localhost</code> or HTTPS (secure context required)</span></div>
+            <div class="guide-step"><span class="guide-n">&#183;</span><span>KioskDongle connected to this computer via USB-C</span></div>
+
+            <div class="guide-h">Connecting</div>
+            <div class="guide-step"><span class="guide-n">1.</span><span>Plug the KioskDongle into a USB-C port on this computer</span></div>
+            <div class="guide-step"><span class="guide-n">2.</span><span>Click <b>Enable WebHID Mode</b> in the status bar &#8212; the amber glow indicates it is available</span></div>
+            <div class="guide-step"><span class="guide-n">3.</span><span>Select <b>KioskDongle</b> in the browser device chooser and click <b>Connect</b></span></div>
+            <div class="guide-step"><span class="guide-n">4.</span><span>The device name turns green and live stats appear &#8212; you are connected</span></div>
+
+            <div class="guide-h">Verifying Data Flow</div>
+            <div class="guide-step"><span class="guide-n">&#183;</span><span><b>RX (Reticulum &#8594; kiosk):</b> Gateway KiB/s shows non-zero when Reticulum sends data</span></div>
+            <div class="guide-step"><span class="guide-n">&#183;</span><span><b>TX (kiosk &#8594; Reticulum):</b> HID rpt/s goes non-zero; client app status bar turns green</span></div>
+            <div class="guide-step"><span class="guide-n">&#183;</span><span>Green RX bars and blue TX bars in the right sidebar animate on traffic</span></div>
+
+            <div class="guide-h">Peer Link Modes</div>
+            <div class="guide-step"><span class="guide-n">BLE</span><span>&nbsp;Dongle relays via Bluetooth LE to the client laptop. Run: <code>python main.py --uplink ble --mode webhid</code></span></div>
+            <div class="guide-step"><span class="guide-n">Wi&#8209;Fi</span><span>&nbsp;Dongle hosts its own Wi-Fi AP — no laptop needed.</span></div>
+            <div class="guide-step"><span class="guide-n">&nbsp;1.</span><span>Set SSID &amp; password in the fields above, click <b>Apply + Reboot</b>, then connect your computer to the dongle&#8217;s Wi-Fi network.</span></div>
+            <div class="guide-step"><span class="guide-n">&nbsp;2.</span><span>Add a <code>[[TCPClientInterface]]</code> entry to <code>~/.reticulum/config</code> pointing at the dongle&#8217;s fixed IP:<br><code>[[TCPClientInterface]]<br>&nbsp;&nbsp;target_host = 10.77.0.1<br>&nbsp;&nbsp;target_port = 4243</code></span></div>
+            <div class="guide-step"><span class="guide-n">&nbsp;3.</span><span>No client app needed — Reticulum connects directly to the dongle over Wi-Fi.</span></div>
+
+            <div class="guide-h">Troubleshooting</div>
+            <div class="guide-step"><span class="guide-n">&#183;</span><span><b>Button greyed out</b> &#8212; browser lacks WebHID support. Use Chrome or Edge on desktop.</span></div>
+            <div class="guide-step"><span class="guide-n">&#183;</span><span><b>Empty device chooser</b> &#8212; check USB cable; try unplugging and reconnecting the dongle.</span></div>
+            <div class="guide-step"><span class="guide-n">&#183;</span><span><b>Stats stuck at zero</b> &#8212; confirm Reticulum is running and the client app is up on port 4243.</span></div>
+            <div class="guide-step"><span class="guide-n">&#183;</span><span><b>Device keeps disconnecting</b> &#8212; use a direct USB port; powered hubs can drop vendor HID devices.</span></div>
+
+            <div class="guide-warn">&#9888; This mode is experimental. Data loss may occur under heavy load or marginal BLE links. Standard QR mode remains available at any time via &#8592; Standard.</div>
+
+          </div>
+        </details>
+
+      </div>
+    </div>
   </div>
 
   <div id="sidebar">
@@ -195,8 +511,8 @@
       <div class="stream-events" id="rx-events"></div>
     </div>
     <div id="sidebar-label">
-      <span>RX ↑</span>
-      <span>TX ↓</span>
+      <span>RX &#8593;</span>
+      <span>TX &#8595;</span>
     </div>
     <div id="tx-panel">
       <div class="stream-events" id="tx-events"></div>
@@ -204,7 +520,6 @@
   </div>
 </div>
 
-<!-- Always-focused sink for HID keyboard input -->
 <input id="hid-input"
        type="text"
        autocomplete="off"
@@ -214,15 +529,38 @@
        tabindex="0"
        aria-hidden="true">
 
-<!-- qrcode-generator (kazuhikoarase). Byte mode, no UTF-8 re-encoding. -->
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 
 <script>
 "use strict";
 
-// ─── HDLC (Reticulum TCP interface framing) ──────────────────────────────────
+// ─── constants (mirror shared/framing.py) ────────────────────────────────────
+const FRAME_MS              = 200;
+const MAX_QR_CHUNK          = 80;
+const HID_REPORT_SIZE       = 63;
+const HID_REPORT_PAYLOAD_MAX = HID_REPORT_SIZE - 1;
+const ESP_VENDOR_ID         = 0x303A;
+const VENDOR_USAGE_PAGE     = 0xFF00;
+const VENDOR_REPORT_ID      = 6;
+const CONFIG_REPORT_ID      = 7;
+const CONFIG_REPORT_SIZE    = 63;
+const CONFIG_WIFI_SSID_MAX  = 32;
+const CONFIG_WIFI_PASS_MAX  = 63;
+const DEFAULT_WIFI_AP_SSID  = 'KioskDongle';
+const DEFAULT_WIFI_AP_PASS  = 'retiqrfast';
+const CONFIG_CMD_NONE            = 0;
+const CONFIG_CMD_GET_STATUS      = 1;
+const CONFIG_CMD_STAGE_MODE_SSID = 2;
+const CONFIG_CMD_STAGE_PASSWORD  = 3;
+const CONFIG_CMD_APPLY           = 4;
+const CONFIG_STATUS_TEXT = {
+  0: 'OK', 1: 'Invalid command', 2: 'Invalid peer mode',
+  3: 'Invalid SSID', 4: 'Invalid password',
+};
+const peerConfigCodec = { enc: new TextEncoder(), dec: new TextDecoder() };
 
-// Parse a raw byte stream, emit complete packets (without flag bytes).
+// ─── HDLC ────────────────────────────────────────────────────────────────────
+
 class HdlcParser {
   constructor(onPacket) {
     this._buf = [];
@@ -245,7 +583,6 @@ class HdlcParser {
   }
 }
 
-// Wrap raw packet bytes in HDLC framing for sending over TCP.
 function hdlcEncode(data) {
   const out = [0x7e];
   for (const b of data) {
@@ -257,11 +594,6 @@ function hdlcEncode(data) {
 }
 
 // ─── HID uplink frame parser ──────────────────────────────────────────────────
-//
-// Pi Zero types:  >HEXHEXHEX CC<
-//   HEXHEX…  = packet bytes as uppercase hex
-//   CC       = XOR checksum of all packet bytes, 2 hex chars
-//   >  <     = frame delimiters (safe on all keyboard layouts alongside hex charset)
 
 class HidParser {
   constructor(onPacket) {
@@ -270,7 +602,7 @@ class HidParser {
   }
   push(chars) {
     this._buf += chars;
-    if (this._buf.length > 4096) this._buf = this._buf.slice(-2048); // overflow guard
+    if (this._buf.length > 4096) this._buf = this._buf.slice(-2048);
     let s, e;
     while ((s = this._buf.indexOf('>')) !== -1 &&
            (e = this._buf.indexOf('<', s + 1)) !== -1) {
@@ -282,17 +614,13 @@ class HidParser {
   _decode(hex) {
     hex = hex.toUpperCase().replace(/[^0-9A-F]/g, '');
     if (hex.length < 4 || hex.length % 2 !== 0) return;
-
     const crcHex  = hex.slice(-2);
     const dataHex = hex.slice(0, -2);
     const data    = new Uint8Array(dataHex.length / 2);
-
     for (let i = 0; i < data.length; i++)
       data[i] = parseInt(dataHex.slice(i * 2, i * 2 + 2), 16);
-
     let crc = 0;
     for (const b of data) crc ^= b;
-
     if (crc === parseInt(crcHex, 16)) this._cb(data);
   }
 }
@@ -314,19 +642,15 @@ function sizeCanvas() {
 sizeCanvas();
 window.addEventListener('resize', sizeCanvas);
 
-// Render a Uint8Array to the canvas as a QR code (binary / Byte mode).
 function renderQR(data) {
   const str = Array.from(data, b => String.fromCharCode(b)).join('');
-
-  const qr = qrcode(0, 'M');   // auto version, medium ECC
+  const qr = qrcode(0, 'M');
   qr.addData(str, 'Byte');
   qr.make();
-
-  const n     = qr.getModuleCount();
-  const dim   = parseInt(canvas.style.width);  // CSS pixels
-  const QUIET = 4;                              // QR spec minimum quiet zone (modules)
-  const cell  = dim / (n + 2 * QUIET);
-
+  const n    = qr.getModuleCount();
+  const dim  = parseInt(canvas.style.width);
+  const QUIET = 4;
+  const cell = dim / (n + 2 * QUIET);
   if (canvas.width !== dim || canvas.height !== dim) {
     canvas.width  = dim;
     canvas.height = dim;
@@ -334,13 +658,11 @@ function renderQR(data) {
   ctx.fillStyle = '#0a0a0a';
   ctx.fillRect(0, 0, dim, dim);
   ctx.fillStyle = '#ffffff';
-
   for (let r = 0; r < n; r++)
     for (let c = 0; c < n; c++)
       if (qr.isDark(r, c))
         ctx.fillRect(Math.floor((c + QUIET) * cell), Math.floor((r + QUIET) * cell),
                      Math.ceil(cell), Math.ceil(cell));
-
   idleMsg.style.display = 'none';
 }
 
@@ -350,13 +672,11 @@ function showIdle() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 
-// ─── Sidebar stream panels ────────────────────────────────────────────────────
+// ─── sidebar stream panels ────────────────────────────────────────────────────
 
-const MAX_EVENTS  = 20;   // rows kept in the DOM per panel
-const MAX_BYTES   = 500;  // packet size that fills the bar 100%
+const MAX_EVENTS = 20;
+const MAX_BYTES  = 500;
 
-// rx: append (newest at bottom, closest to center label, grows upward)
-// tx: prepend (newest at top, closest to center label, grows downward)
 function addEvent(containerId, bytes, barClass) {
   const container = document.getElementById(containerId);
   const isRx      = containerId === 'rx-events';
@@ -364,16 +684,13 @@ function addEvent(containerId, bytes, barClass) {
   const label     = bytes >= 1024
     ? (bytes / 1024).toFixed(1) + 'k'
     : bytes + 'B';
-
   const el = document.createElement('div');
   el.className = 'stream-event';
   el.innerHTML =
     `<div class="event-bar-bg"><div class="event-bar ${barClass}" style="width:${pct}%"></div></div>` +
     `<div class="event-size">${label}</div>`;
-
   if (isRx) container.append(el);
   else       container.prepend(el);
-
   const events = container.querySelectorAll('.stream-event');
   events.forEach((e, i) => {
     const age = isRx ? events.length - 1 - i : i;
@@ -381,13 +698,11 @@ function addEvent(containerId, bytes, barClass) {
   });
 }
 
-// ─── Packet queue and display loop ───────────────────────────────────────────
+// ─── packet queue and display loop ───────────────────────────────────────────
 
-const queue       = [];
-let   txSeq       = 0;
-let   idle        = true;
-const FRAME_MS    = 200;   // ms per QR frame — tune to camera decode speed
-const MAX_QR_CHUNK = 80;   // max packet bytes per QR frame (matches framing.py)
+const queue = [];
+let txSeq   = 0;
+let idle    = true;
 
 function enqueuePacket(packet) {
   const chunks = [];
@@ -432,34 +747,162 @@ setInterval(() => {
 
 // ─── WebSocket ───────────────────────────────────────────────────────────────
 
-let ws       = null;
-let rxCount  = 0;
-let txCount  = 0;
+let transport = null;
+let ws        = null;
+let rxCount   = 0;
+let txCount   = 0;
 let pendingRxBytes = 0;
 let pendingTxBytes = 0;
-const hdlc   = new HdlcParser(pkt => {
+
+const fastStats = {
+  reset() {
+    this.startedAtMs = performance.now();
+    this.firstReportAtMs = 0; this.lastReportAtMs = 0; this.prevReportAtMs = 0;
+    this.firstSendAtMs = 0;   this.lastSendAtMs = 0;
+    this.hidReportsIn = 0;    this.hidBytesIn = 0;
+    this.wsSendsOut = 0;      this.wsBytesOut = 0;    this.wsSkipped = 0;
+    this.handlerTotalMs = 0;  this.handlerMaxMs = 0;  this.handlerOver1Ms = 0;
+    this.wsBufferedBeforeMax = 0; this.wsBufferedAfterMax = 0;
+    this.wsBufferedGrowthEvents = 0; this.wsBufferedGrowthBytes = 0;
+    this.reportGapTotalMs = 0; this.reportGapMaxMs = 0;
+    this.reportGapOver2Ms = 0; this.reportGapOver5Ms = 0;
+  },
+  snapshot() {
+    const now = performance.now();
+    const elapsedMs = Math.max(now - this.startedAtMs, 1);
+    const reportWindowMs = this.firstReportAtMs
+      ? Math.max((this.lastReportAtMs || now) - this.firstReportAtMs, 1) : 0;
+    const sendWindowMs = this.firstSendAtMs
+      ? Math.max((this.lastSendAtMs || now) - this.firstSendAtMs, 1) : 0;
+    return {
+      elapsedMs, reportWindowMs, sendWindowMs,
+      hidReportsIn: this.hidReportsIn, hidBytesIn: this.hidBytesIn,
+      wsSendsOut: this.wsSendsOut, wsBytesOut: this.wsBytesOut,
+      wsSkipped: this.wsSkipped,
+      handlerAvgMs: this.hidReportsIn ? this.handlerTotalMs / this.hidReportsIn : 0,
+      handlerMaxMs: this.handlerMaxMs, handlerOver1Ms: this.handlerOver1Ms,
+      reportsPerSec:       this.hidReportsIn * 1000 / elapsedMs,
+      hidKiBsPerSec:       this.hidBytesIn / 1024 * 1000 / elapsedMs,
+      wsKiBsPerSec:        this.wsBytesOut / 1024 * 1000 / elapsedMs,
+      activeReportsPerSec: reportWindowMs ? this.hidReportsIn * 1000 / reportWindowMs : 0,
+      activeHidKiBsPerSec: reportWindowMs ? this.hidBytesIn / 1024 * 1000 / reportWindowMs : 0,
+      activeWsKiBsPerSec:  sendWindowMs ? this.wsBytesOut / 1024 * 1000 / sendWindowMs : 0,
+      avgPayloadBytes:     this.hidReportsIn ? this.hidBytesIn / this.hidReportsIn : 0,
+      reportGapAvgMs:  this.hidReportsIn > 1 ? this.reportGapTotalMs / (this.hidReportsIn - 1) : 0,
+      reportGapMaxMs:  this.reportGapMaxMs,
+      reportGapOver2Ms: this.reportGapOver2Ms, reportGapOver5Ms: this.reportGapOver5Ms,
+      wsBufferedBeforeMax: this.wsBufferedBeforeMax, wsBufferedAfterMax: this.wsBufferedAfterMax,
+      wsBufferedGrowthEvents: this.wsBufferedGrowthEvents,
+      wsBufferedGrowthBytes: this.wsBufferedGrowthBytes,
+    };
+  },
+  noteInputReport(payloadBytes, handlerMs, bufferedBefore, bufferedAfter, sent) {
+    const now = performance.now();
+    if (!this.firstReportAtMs) this.firstReportAtMs = now;
+    if (this.prevReportAtMs) {
+      const gapMs = now - this.prevReportAtMs;
+      this.reportGapTotalMs += gapMs;
+      if (gapMs > this.reportGapMaxMs) this.reportGapMaxMs = gapMs;
+      if (gapMs >= 2) this.reportGapOver2Ms += 1;
+      if (gapMs >= 5) this.reportGapOver5Ms += 1;
+    }
+    this.prevReportAtMs = now;
+    this.lastReportAtMs = now;
+    this.hidReportsIn  += 1;
+    this.hidBytesIn    += payloadBytes;
+    this.handlerTotalMs += handlerMs;
+    if (handlerMs > this.handlerMaxMs) this.handlerMaxMs = handlerMs;
+    if (handlerMs >= 1) this.handlerOver1Ms += 1;
+    if (bufferedBefore > this.wsBufferedBeforeMax) this.wsBufferedBeforeMax = bufferedBefore;
+    if (bufferedAfter  > this.wsBufferedAfterMax)  this.wsBufferedAfterMax  = bufferedAfter;
+    if (bufferedAfter > bufferedBefore) {
+      this.wsBufferedGrowthEvents += 1;
+      this.wsBufferedGrowthBytes  += bufferedAfter - bufferedBefore;
+    }
+    if (sent) {
+      if (!this.firstSendAtMs) this.firstSendAtMs = now;
+      this.lastSendAtMs = now;
+      this.wsSendsOut  += 1;
+      this.wsBytesOut  += payloadBytes;
+    } else {
+      this.wsSkipped += 1;
+    }
+  },
+};
+fastStats.reset();
+
+const bridgeStats = {
+  reset() {
+    this.upKiBsPerSec = 0; this.downKiBsPerSec = 0;
+    this.lastNonZeroUpKiBsPerSec = 0; this.lastNonZeroDownKiBsPerSec = 0;
+    this.upTotal = 0; this.downTotal = 0;
+    this.lastUpdateMs = 0; this.lastNonZeroUpdateMs = 0;
+  },
+  note(payload) {
+    this.upKiBsPerSec   = payload.up_kibps  || 0;
+    this.downKiBsPerSec = payload.down_kibps || 0;
+    if (this.upKiBsPerSec > 0 || this.downKiBsPerSec > 0) {
+      this.lastNonZeroUpKiBsPerSec   = this.upKiBsPerSec;
+      this.lastNonZeroDownKiBsPerSec = this.downKiBsPerSec;
+      this.lastNonZeroUpdateMs = performance.now();
+    }
+    this.upTotal   = payload.up_total   || 0;
+    this.downTotal = payload.down_total || 0;
+    this.lastUpdateMs = performance.now();
+  },
+  fresh(maxAgeMs = 3000) {
+    return this.lastUpdateMs && (performance.now() - this.lastUpdateMs) <= maxAgeMs;
+  },
+};
+bridgeStats.reset();
+
+window.__whidStats = {
+  snapshot: () => fastStats.snapshot(),
+  reset:    () => fastStats.reset(),
+};
+
+const hdlc = new HdlcParser(pkt => {
   rxCount++;
   enqueuePacket(pkt);
   pendingRxBytes += pkt.length;
 });
 
+function onWsBytes(bytes) {
+  if (transport) {
+    transport.sendBytes(bytes);
+    rxCount++;
+    pendingRxBytes += bytes.length;
+    blink(rxDot);
+  } else {
+    hdlc.push(bytes);
+  }
+}
+
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   ws = new WebSocket(`${proto}//${location.host}/ws`);
   ws.binaryType = 'arraybuffer';
-
   ws.onopen  = () => setWsStatus('connected', true);
   ws.onclose = () => { setWsStatus('offline', false); setTimeout(connect, 2500); };
   ws.onerror = () => ws.close();
-  ws.onmessage = e => hdlc.push(new Uint8Array(e.data));
+  ws.onmessage = e => {
+    if (typeof e.data === 'string') {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg && msg.type === 'splice_stats') bridgeStats.note(msg);
+      } catch (_) {}
+      return;
+    }
+    onWsBytes(new Uint8Array(e.data));
+  };
 }
-
 connect();
 
-// ─── HID uplink ──────────────────────────────────────────────────────────────
+// ─── HID keyboard uplink (standard mode) ─────────────────────────────────────
 
 const hidInput = document.getElementById('hid-input');
 const hid      = new HidParser(pkt => {
+  if (transport) return;
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(hdlcEncode(pkt));
     txCount++;
@@ -473,11 +916,353 @@ hidInput.addEventListener('input', () => {
   hidInput.value = '';
 });
 
-// Keep focus on the input so HID keystrokes are always captured.
-function refocus() { if (document.activeElement !== hidInput) hidInput.focus(); }
+function refocus() {
+  if (transport) return;
+  if (document.activeElement !== hidInput) hidInput.focus();
+}
 setInterval(refocus, 250);
 document.addEventListener('click', refocus);
 document.addEventListener('touchstart', refocus);
+
+// ─── WebHID transport ─────────────────────────────────────────────────────────
+
+class WebHidTransport {
+  constructor(device) {
+    this.device = device;
+    this._closed = false;
+    this._sendChain = Promise.resolve();
+    this._configWaiter = null;
+    device.addEventListener('inputreport', e => this._onInputReport(e));
+  }
+
+  static async request() {
+    const devices = await navigator.hid.requestDevice({
+      filters: [{ vendorId: ESP_VENDOR_ID, usagePage: VENDOR_USAGE_PAGE }],
+    });
+    if (!devices || devices.length === 0) return null;
+    const device = devices[0];
+    if (!device.opened) await device.open();
+    return new WebHidTransport(device);
+  }
+
+  sendBytes(bytes) {
+    if (this._closed || bytes.length === 0) return this._sendChain;
+    const payload = new Uint8Array(bytes);
+    this._sendChain = this._sendChain
+      .then(() => this._sendBytesNow(payload))
+      .catch(err => { console.warn('[webhid] sendReport failed:', err); });
+    return this._sendChain;
+  }
+
+  async _sendBytesNow(bytes) {
+    if (this._closed) return;
+    for (let i = 0; i < bytes.length; i += HID_REPORT_PAYLOAD_MAX) {
+      if (this._closed) return;
+      const slice  = bytes.subarray(i, i + HID_REPORT_PAYLOAD_MAX);
+      const report = new Uint8Array(HID_REPORT_SIZE);
+      report[0] = slice.length;
+      report.set(slice, 1);
+      await this.device.sendReport(VENDOR_REPORT_ID, report);
+    }
+  }
+
+  async _sendConfigReport(fill) {
+    if (this._closed) throw new Error('Transport is closed');
+    const report = new Uint8Array(CONFIG_REPORT_SIZE);
+    fill(report);
+    await this.device.sendReport(CONFIG_REPORT_ID, report);
+  }
+
+  async readPeerConfig() {
+    if (this._configWaiter) throw new Error('A config request is already in flight');
+    let timeoutId = 0;
+    const response = new Promise((resolve, reject) => {
+      timeoutId = window.setTimeout(() => {
+        if (this._configWaiter && this._configWaiter.reject === reject) {
+          this._configWaiter = null;
+          reject(new Error('Timed out waiting for config response'));
+        }
+      }, 2000);
+      this._configWaiter = {
+        resolve: config => { window.clearTimeout(timeoutId); this._configWaiter = null; resolve(config); },
+        reject:  err    => { window.clearTimeout(timeoutId); this._configWaiter = null; reject(err); },
+      };
+    });
+    try {
+      await this._sendConfigReport(report => { report[0] = CONFIG_CMD_GET_STATUS; });
+    } catch (err) {
+      if (this._configWaiter) { this._configWaiter.reject(err); this._configWaiter = null; }
+      throw err;
+    }
+    return response;
+  }
+
+  async writePeerConfig(config) {
+    const { mode, ssid, pass } = encodePeerConfig(config);
+    await this._sendConfigReport(report => {
+      report[0] = CONFIG_CMD_STAGE_MODE_SSID;
+      report[1] = mode === 'wifi-ap' ? 1 : 0;
+      report[2] = ssid.length;
+      report.set(ssid, 3);
+    });
+    if (pass.length > 0) {
+      await this._sendConfigReport(report => {
+        report[0] = CONFIG_CMD_STAGE_PASSWORD;
+        report[1] = pass.length;
+        report.set(pass, 2);
+      });
+    }
+    await this._sendConfigReport(report => { report[0] = config.command; });
+  }
+
+  _onInputReport(event) {
+    if (this._closed) return;
+    if (event.reportId === CONFIG_REPORT_ID) {
+      const config = decodePeerConfig(event.data);
+      if (this._configWaiter) this._configWaiter.resolve(config);
+      return;
+    }
+    if (event.reportId !== VENDOR_REPORT_ID) return;
+    const t0  = performance.now();
+    const buf = new Uint8Array(event.data.buffer, event.data.byteOffset, event.data.byteLength);
+    let n = buf[0];
+    if (n > HID_REPORT_PAYLOAD_MAX) n = HID_REPORT_PAYLOAD_MAX;
+    if (n === 0) return;
+    const payload = buf.subarray(1, 1 + n);
+    let sent = false, bufferedBefore = 0, bufferedAfter = 0;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      bufferedBefore = ws.bufferedAmount;
+      ws.send(payload);
+      bufferedAfter  = ws.bufferedAmount;
+      sent = true;
+      txCount++;
+      blink(txDot);
+      pendingTxBytes += payload.length;
+    }
+    fastStats.noteInputReport(payload.length, performance.now() - t0,
+                               bufferedBefore, bufferedAfter, sent);
+  }
+
+  async close() {
+    this._closed = true;
+    if (this._configWaiter) {
+      this._configWaiter.reject(new Error('Transport closed'));
+      this._configWaiter = null;
+    }
+    try { await this._sendChain; } catch {}
+    try { await this.device.close(); } catch {}
+  }
+}
+
+// ─── peer-config helpers ─────────────────────────────────────────────────────
+
+function decodePeerConfig(dataView) {
+  const buf     = new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
+  const ssidLen = Math.min(buf[4] || 0, CONFIG_WIFI_SSID_MAX);
+  return {
+    version:        buf[0] || 0,
+    configuredMode: buf[1] === 1 ? 'wifi-ap' : 'ble',
+    activeMode:     buf[2] === 1 ? 'wifi-ap' : 'ble',
+    statusCode:     buf[3] || 0,
+    ssid:           peerConfigCodec.dec.decode(buf.slice(5, 5 + ssidLen)),
+    flags:          buf[61] || 0,
+  };
+}
+
+function encodePeerConfig({ mode, ssid, pass }) {
+  const ssidBytes = peerConfigCodec.enc.encode(ssid);
+  const passBytes = pass ? peerConfigCodec.enc.encode(pass) : new Uint8Array(0);
+  if (ssidBytes.length === 0 || ssidBytes.length > CONFIG_WIFI_SSID_MAX)
+    throw new Error(`Wi-Fi SSID must be 1-${CONFIG_WIFI_SSID_MAX} bytes`);
+  if (passBytes.length > 0 && (passBytes.length < 8 || passBytes.length > CONFIG_WIFI_PASS_MAX))
+    throw new Error('Wi-Fi password must be 8–63 bytes');
+  return { mode, ssid: ssidBytes, pass: passBytes };
+}
+
+function applyPeerConfigToUi(config) {
+  peerModeSelect.value = config.configuredMode;
+  wifiSsidInput.value  = config.ssid;
+  updatePeerModeUi();
+  const status = CONFIG_STATUS_TEXT[config.statusCode] || `Status ${config.statusCode}`;
+  setPeerConfigStatus(`Configured ${config.configuredMode}; active ${config.activeMode}; ${status}`);
+}
+
+// ─── DOM refs ────────────────────────────────────────────────────────────────
+
+const fastBtn            = document.getElementById('fast-btn');
+const webhidArea         = document.getElementById('webhid-area');
+const webhidDevice       = document.getElementById('webhid-device');
+const webhidStats        = document.getElementById('webhid-stats');
+const webhidInvite       = document.getElementById('webhid-invite');
+const peerModeSelect     = document.getElementById('peer-mode-select');
+const wifiSsidRow        = document.getElementById('wifi-ssid-row');
+const wifiPassRow        = document.getElementById('wifi-pass-row');
+const wifiSsidInput      = document.getElementById('wifi-ssid-input');
+const wifiPassInput      = document.getElementById('wifi-pass-input');
+const wifiPassToggle     = document.getElementById('wifi-pass-toggle');
+const peerApplyBtn       = document.getElementById('peer-apply-btn');
+const webhidConfigStatus = document.getElementById('webhid-config-status');
+const qrCanvas           = document.getElementById('qr-canvas');
+let peerConfigRequestSeq = 0;
+
+function setPeerConfigStatus(text) { webhidConfigStatus.textContent = text || '—'; }
+
+function setPeerControlsEnabled(enabled) {
+  peerModeSelect.disabled = !enabled;
+  wifiSsidInput.disabled  = !enabled;
+  wifiPassInput.disabled  = !enabled;
+  wifiPassToggle.disabled = !enabled;
+  peerApplyBtn.disabled   = !enabled;
+}
+
+function updatePeerModeUi() {
+  const wifi = peerModeSelect.value === 'wifi-ap';
+  wifiSsidRow.hidden = !wifi;
+  wifiPassRow.hidden = !wifi;
+}
+
+function setWifiPasswordVisible(visible) {
+  wifiPassInput.type = visible ? 'text' : 'password';
+  wifiPassToggle.textContent = visible ? 'Hide' : 'Show';
+  wifiPassToggle.setAttribute('aria-pressed', visible ? 'true' : 'false');
+}
+
+// ─── mode transitions ────────────────────────────────────────────────────────
+
+function setFastMode(active, device) {
+  if (active) {
+    fastStats.reset();
+    bridgeStats.reset();
+    webhidArea.classList.add('active');
+    qrCanvas.style.display  = 'none';
+    idleMsg.style.display   = 'none';
+    if (webhidInvite) webhidInvite.hidden = true;
+    fastBtn.classList.add('active');
+    fastBtn.textContent = 'WebHID ●';
+    webhidDevice.textContent = device ? device.productName || 'HID device' : '—';
+    webhidStats.innerHTML    = '<span class="sg-l">measuring…</span>';
+    setPeerControlsEnabled(true);
+    queue.length = 0;
+  } else {
+    webhidArea.classList.remove('active');
+    qrCanvas.style.display = '';
+    fastBtn.classList.remove('active');
+    fastBtn.textContent = 'Enable WebHID Mode';
+    if (webhidInvite) webhidInvite.hidden = false;
+    webhidDevice.textContent = '—';
+    webhidStats.innerHTML    = '—';
+    setPeerControlsEnabled(false);
+    setPeerConfigStatus('');
+  }
+}
+
+setPeerControlsEnabled(false);
+updatePeerModeUi();
+setWifiPasswordVisible(false);
+setPeerConfigStatus('');
+
+async function refreshPeerConfigUi(targetTransport = transport) {
+  if (!targetTransport) return;
+  const seq = ++peerConfigRequestSeq;
+  setPeerConfigStatus('Loading peer-link settings…');
+  try {
+    const config = await targetTransport.readPeerConfig();
+    if (seq !== peerConfigRequestSeq || targetTransport !== transport) return;
+    applyPeerConfigToUi(config);
+  } catch (err) {
+    if (seq !== peerConfigRequestSeq) return;
+    setPeerConfigStatus(`Failed to read settings: ${err.message || err}`);
+  }
+}
+
+async function applyPeerConfigFromUi() {
+  if (!transport) return;
+  try {
+    setPeerControlsEnabled(false);
+    await transport.writePeerConfig({
+      command: CONFIG_CMD_APPLY,
+      mode:    peerModeSelect.value,
+      ssid:    wifiSsidInput.value.trim(),
+      pass:    wifiPassInput.value,
+    });
+    setPeerConfigStatus('Settings saved; dongle rebooting. Once rebooted, refresh this page.');
+  } catch (err) {
+    setPeerConfigStatus(`Apply failed: ${err.message || err}`);
+    setPeerControlsEnabled(true);
+  }
+}
+
+function attachFastTransport(nextTransport) {
+  transport = nextTransport;
+  setFastMode(true, nextTransport.device);
+  refreshPeerConfigUi(nextTransport);
+  nextTransport.device.addEventListener('disconnect', () => {
+    if (transport !== nextTransport) return;
+    console.warn('[webhid] device disconnected — falling back to standard');
+    transport = null;
+    setFastMode(false);
+  });
+}
+
+async function tryAutoAttachDevice(device) {
+  if (!device || transport) return;
+  const matches = device.vendorId === ESP_VENDOR_ID &&
+    device.collections.some(c => c.usagePage === VENDOR_USAGE_PAGE);
+  if (!matches) return;
+  try {
+    if (!device.opened) await device.open();
+    attachFastTransport(new WebHidTransport(device));
+  } catch (err) {
+    console.warn('[webhid] auto-attach failed:', err);
+  }
+}
+
+async function connectFastPath() {
+  if (transport) {
+    const t = transport;
+    transport = null;
+    setFastMode(false);
+    await t.close();
+    return;
+  }
+  try {
+    const t = await WebHidTransport.request();
+    if (!t) return;
+    attachFastTransport(t);
+  } catch (err) {
+    console.error('[webhid] request failed:', err);
+  }
+}
+
+// ─── feature detection ───────────────────────────────────────────────────────
+
+if ('hid' in navigator && window.isSecureContext) {
+  fastBtn.disabled = false;
+  fastBtn.classList.add('available');
+  fastBtn.textContent = 'Enable WebHID Mode';
+  if (webhidInvite) webhidInvite.hidden = false;
+
+  fastBtn.addEventListener('click', connectFastPath);
+  document.getElementById('webhid-exit-btn').addEventListener('click', connectFastPath);
+  peerModeSelect.addEventListener('change', updatePeerModeUi);
+  wifiPassToggle.addEventListener('click', () => {
+    setWifiPasswordVisible(wifiPassInput.type === 'password');
+  });
+  peerApplyBtn.addEventListener('click', applyPeerConfigFromUi);
+
+  navigator.hid.addEventListener('connect', event => tryAutoAttachDevice(event.device));
+
+  navigator.hid.getDevices().then(async devs => {
+    const match = devs.find(d =>
+      d.vendorId === ESP_VENDOR_ID &&
+      d.collections.some(c => c.usagePage === VENDOR_USAGE_PAGE)
+    );
+    if (match) {
+      try { await tryAutoAttachDevice(match); }
+      catch (err) { console.warn('[webhid] auto-reattach failed:', err); }
+    }
+  });
+}
 
 // ─── UI helpers ──────────────────────────────────────────────────────────────
 
@@ -495,18 +1280,52 @@ function setWsStatus(text, ok) {
   wsDot.className    = 'dot' + (ok ? ' on' : ' err');
 }
 
+function fmt(n, d = 1) { return n.toFixed(d); }
+
+function updateFastStats() {
+  if (!transport) return;
+  const s = fastStats.snapshot();
+  const b = bridgeStats;
+
+  const gwUp = b.fresh()
+    ? fmt(b.upKiBsPerSec)
+    : (b.lastNonZeroUpKiBsPerSec > 0 ? fmt(b.lastNonZeroUpKiBsPerSec) + '~' : '—');
+  const gwDn = b.fresh()
+    ? fmt(b.downKiBsPerSec)
+    : (b.lastNonZeroDownKiBsPerSec > 0 ? fmt(b.lastNonZeroDownKiBsPerSec) + '~' : '—');
+
+  const activeClass = s.activeWsKiBsPerSec > 0.01 ? ' hi' : '';
+
+  webhidStats.innerHTML =
+    `<span class="sg-l">Gateway</span>` +
+    `<span class="sg-v">↑${gwUp} KiB/s</span>` +
+    `<span class="sg-v">↓${gwDn} KiB/s</span>` +
+
+    `<span class="sg-l">HID→WS</span>` +
+    `<span class="sg-v${activeClass}">${fmt(s.activeWsKiBsPerSec)} KiB/s</span>` +
+    `<span class="sg-v">${fmt(s.activeReportsPerSec, 0)} rpt/s</span>` +
+
+    `<span class="sg-l">Avg</span>` +
+    `<span class="sg-v">${fmt(s.avgPayloadBytes, 0)} B/rpt</span>` +
+    `<span class="sg-v">gap ${fmt(s.reportGapAvgMs, 2)} ms</span>`;
+}
+
 function updateUI() {
   rxEl.textContent    = rxCount;
   txEl.textContent    = txCount;
   queueEl.textContent = queue.length;
   seqEl.textContent   = 'seq ' + txSeq.toString(16).padStart(4, '0');
+  updateFastStats();
 }
 
 const blinkTimers = new Map();
 function blink(el) {
   el.classList.add('on');
   clearTimeout(blinkTimers.get(el));
-  blinkTimers.set(el, setTimeout(() => { el.classList.remove('on'); blinkTimers.delete(el); }, 120));
+  blinkTimers.set(el, setTimeout(() => {
+    el.classList.remove('on');
+    blinkTimers.delete(el);
+  }, 120));
 }
 </script>
 </body>

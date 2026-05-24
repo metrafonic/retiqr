@@ -187,3 +187,92 @@ async def test_tx_escapes_special_bytes(bridge: Bridge):
 
     writer.close()
     await writer.wait_closed()
+
+
+# ─── Fast-path (WebHID) bridge behaviour ─────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_put_rx_raw_writes_unmodified(bridge: Bridge):
+    """put_rx_raw writes the bytes to Reticulum verbatim (no HDLC re-encode)."""
+    reader, writer = await _connect(bridge._port)
+    await asyncio.sleep(0.05)
+
+    # Already-HDLC-framed bytes — must be delivered as-is.
+    raw = hdlc_encode(b"\x01\x02\x03")
+    bridge.put_rx_raw(raw)
+
+    data = await asyncio.wait_for(reader.read(64), timeout=2)
+    assert data == raw       # byte-for-byte, no double-encoding
+
+    writer.close()
+    await writer.wait_closed()
+
+
+@pytest.mark.asyncio
+async def test_mixed_packet_and_raw_writes_preserve_order(bridge: Bridge):
+    """Legacy and raw writes share one ordered drain() path on the socket."""
+    reader, writer = await _connect(bridge._port)
+    await asyncio.sleep(0.05)
+
+    pkt = b"\x01\x02"
+    raw = hdlc_encode(b"\xaa")
+    expected = hdlc_encode(pkt) + raw
+
+    bridge.put_rx(pkt)
+    bridge.put_rx_raw(raw)
+
+    buf = bytearray()
+    deadline = asyncio.get_event_loop().time() + 2
+    while asyncio.get_event_loop().time() < deadline and len(buf) < len(expected):
+        buf.extend(await asyncio.wait_for(reader.read(64), timeout=1))
+
+    assert bytes(buf) == expected
+
+    writer.close()
+    await writer.wait_closed()
+
+
+@pytest.mark.asyncio
+async def test_on_tx_raw_fires_with_socket_chunks(bridge: Bridge):
+    """on_tx_raw fires with raw socket chunks BEFORE HDLC decode."""
+    raw_chunks: list[bytes] = []
+    bridge.on_tx_raw = raw_chunks.append
+
+    reader, writer = await _connect(bridge._port)
+    await asyncio.sleep(0.05)
+
+    pkt = b"\xaa\xbb\xcc"
+    framed = hdlc_encode(pkt)
+    writer.write(framed)
+    await writer.drain()
+
+    await asyncio.sleep(0.1)
+    # The socket may have coalesced or split the write, so check by content.
+    assert b"".join(raw_chunks) == framed
+
+    writer.close()
+    await writer.wait_closed()
+
+
+@pytest.mark.asyncio
+async def test_on_tx_raw_and_packet_fire_together(bridge: Bridge):
+    """Both callbacks fire for the same connection — caller chooses which to use."""
+    raw_chunks: list[bytes] = []
+    packets: list[bytes] = []
+    bridge.on_tx_raw = raw_chunks.append
+    bridge.on_tx_packet = packets.append
+
+    reader, writer = await _connect(bridge._port)
+    await asyncio.sleep(0.05)
+
+    pkt = b"\x10\x20\x30"
+    writer.write(hdlc_encode(pkt))
+    await writer.drain()
+
+    await asyncio.sleep(0.1)
+    assert packets == [pkt]
+    assert b"".join(raw_chunks) == hdlc_encode(pkt)
+
+    writer.close()
+    await writer.wait_closed()
