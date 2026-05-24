@@ -40,13 +40,11 @@ class _Connection:
         self,
         reader: asyncio.StreamReader,
         writer: asyncio.StreamWriter,
-        on_tx_packet,
-        on_tx_raw=None,
+        bridge: "Bridge",
     ):
         self._reader = reader
         self._writer = writer
-        self._on_tx = on_tx_packet
-        self._on_tx_raw = on_tx_raw
+        self._bridge = bridge   # read callbacks dynamically so mode switches take effect
         self._rx_queue: asyncio.Queue[tuple[str, bytes] | None] = asyncio.Queue()
         self._loop = asyncio.get_running_loop()
         self._closed = False
@@ -92,17 +90,19 @@ class _Connection:
             chunk = await self._reader.read(4096)
             if not chunk:
                 break
-            if self._on_tx_raw:
-                self._on_tx_raw(bytes(chunk))
+            cb_raw = self._bridge.on_tx_raw
+            if cb_raw:
+                cb_raw(bytes(chunk))
             buf.extend(chunk)
             packets = hdlc_decode_stream(bytes(buf))
             # Keep only the tail from the last flag byte onward.
             last_flag = buf.rfind(0x7E)
             buf = buf[last_flag + 1:] if last_flag != -1 else buf
+            cb_pkt = self._bridge.on_tx_packet
             for pkt in packets:
                 log.debug("TX packet %d bytes → HID", len(pkt))
-                if self._on_tx:
-                    self._on_tx(pkt)
+                if cb_pkt:
+                    cb_pkt(pkt)
 
     async def _write_to_reticulum(self):
         """Drain the RX queue and serialize all writes to the Reticulum socket."""
@@ -191,7 +191,7 @@ class Bridge:
     async def _handle(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
         peer = writer.get_extra_info("peername")
         log.info("Reticulum connected from %s", peer)
-        conn = _Connection(reader, writer, self.on_tx_packet, self.on_tx_raw)
+        conn = _Connection(reader, writer, self)
         self._connections.append(conn)
         try:
             await conn.run()

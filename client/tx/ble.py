@@ -14,8 +14,12 @@ The dongle advertises as "KioskDongle" and exposes four GATT characteristics:
   WHID_RX_CHAR  (notify): fast path — receives vendor HID Output Reports
                   payloads from the kiosk page (already HDLC-framed bytes).
 
-Both paths share BLE chunking: writes are split into _BLE_CHUNK-byte pieces
-so the wire format is agnostic to negotiated ATT MTU.
+Each path uses its own BLE chunk size:
+  * Legacy (TX_CHAR): 20 bytes — safe on all platforms regardless of MTU.
+  * Fast (WHID_TX_CHAR): 240 bytes — requires negotiated MTU ≥ 243. The MTU
+    negotiation is attempted at connect time; if the platform stays at the
+    23-byte default, bleak will surface a write error and the uplink will
+    reconnect.
 
 Pairing: "Just Works" (no PIN). HDLC's own checksum (legacy: ">HEX<CC<") and
 USB's CRC (fast) catch corruption.
@@ -33,16 +37,14 @@ _TX_CHAR_UUID      = "4b696f73-6b55-0002-0000-000000000000"
 _CFG_CHAR_UUID     = "4b696f73-6b55-0003-0000-000000000000"
 _WHID_RX_CHAR_UUID = "4b696f73-6b55-0004-0000-000000000000"
 _WHID_TX_CHAR_UUID = "4b696f73-6b55-0005-0000-000000000000"
-_DEVICE_NAME       = "KioskDongle"
-_SCAN_TIMEOUT      = 10.0   # seconds per scan attempt
-_RETRY_DELAY       = 3.0    # seconds between failed attempts
-_BLE_CHUNK         = 240    # bytes per write — fits in MTU 247 - 3 ATT header.
-                            # Firmware advertises a preferred MTU of 247; on
-                            # platforms where the negotiation succeeds, a
-                            # whole 63-byte vendor HID report goes in one
-                            # write. Falls back gracefully on platforms that
-                            # only negotiate the 23-byte default (the write
-                            # just errors and bleak surfaces it).
+_DEVICE_NAME           = "KioskDongle"
+_SCAN_TIMEOUT          = 10.0   # seconds per scan attempt
+_RETRY_DELAY           = 3.0    # seconds between failed attempts
+_BLE_CHUNK_LEGACY      = 20     # legacy TX char — safe on every platform (default ATT MTU - 3)
+_BLE_CHUNK_FAST        = 63     # fast WHID-TX char — exactly one HID report body per write.
+                                # Aligns each BLE write with one firmware accumulator flush,
+                                # and interleaves with WHID-RX notifications instead of
+                                # flooding the link with 240-byte bursts.
 
 
 class BleUplink:
@@ -155,11 +157,18 @@ class BleUplink:
                     if item is None:
                         return True  # stop() requested
                     kind_str, frame = item
-                    char_uuid = _WHID_TX_CHAR_UUID if kind_str == "whid_tx" else _TX_CHAR_UUID
-                    for i in range(0, len(frame), _BLE_CHUNK):
+                    if kind_str == "whid_tx":
+                        char_uuid = _WHID_TX_CHAR_UUID
+                        chunk_size = _BLE_CHUNK_FAST
+                    else:
+                        char_uuid = _TX_CHAR_UUID
+                        chunk_size = _BLE_CHUNK_LEGACY
+                    for i in range(0, len(frame), chunk_size):
                         await client.write_gatt_char(
-                            char_uuid, frame[i:i + _BLE_CHUNK], response=False
+                            char_uuid, frame[i:i + chunk_size], response=False
                         )
+                        if kind_str == "whid_tx":
+                            await asyncio.sleep(0)
 
         except Exception as exc:
             log.warning("BLE: %s", exc)
@@ -182,13 +191,13 @@ class NullUplink:
         self.on_connect    = None
         self.on_disconnect = None
         self.on_rx_raw     = None
-        self._queue: asyncio.Queue[bytes | None] = asyncio.Queue()
+        self._queue: asyncio.Queue[tuple[str, bytes] | None] = asyncio.Queue()
 
     def send(self, frame: bytes) -> None:
-        self._queue.put_nowait(frame)
+        self._queue.put_nowait(("tx", frame))
 
     def send_raw(self, payload: bytes) -> None:
-        self._queue.put_nowait(payload)
+        self._queue.put_nowait(("whid_tx", payload))
 
     @property
     def connected(self) -> bool:

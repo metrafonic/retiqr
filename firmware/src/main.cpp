@@ -436,15 +436,6 @@ static bool handleConfigOutputReport(const uint8_t* buffer, uint16_t len) {
     }
 }
 
-static void noteWhidRxQueueDepth(UBaseType_t depth) {
-    uint32_t want = static_cast<uint32_t>(depth);
-    uint32_t cur  = whidRxQueueHighWater.load(std::memory_order_relaxed);
-    while (want > cur &&
-           !whidRxQueueHighWater.compare_exchange_weak(
-               cur, want, std::memory_order_relaxed, std::memory_order_relaxed)) {
-    }
-}
-
 static void noteHighWater(std::atomic<uint32_t>& highWater, uint32_t want) {
     uint32_t cur = highWater.load(std::memory_order_relaxed);
     while (want > cur &&
@@ -585,7 +576,7 @@ public:
         // kiosk page. Drops only if 20 ms isn't enough.
         if (xQueueSend(whidRxQueue, &r, pdMS_TO_TICKS(WHID_QUEUE_BLOCK_MS)) == pdTRUE) {
             whidRxEnqueueOk.fetch_add(1, std::memory_order_relaxed);
-            noteWhidRxQueueDepth(uxQueueMessagesWaiting(whidRxQueue));
+            noteHighWater(whidRxQueueHighWater, static_cast<uint32_t>(uxQueueMessagesWaiting(whidRxQueue)));
         } else {
             whidRxEnqueueDrop.fetch_add(1, std::memory_order_relaxed);
         }

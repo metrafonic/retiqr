@@ -167,6 +167,35 @@ _HID_MOCK_JS = r"""
 """
 
 
+# ─── additional init scripts ─────────────────────────────────────────────────
+
+# Installs navigator.hid but makes requestDevice() reject (permission denied).
+_HID_PERMISSION_DENIED_JS = r"""
+(() => {
+  Object.defineProperty(navigator, 'hid', {
+    value: {
+      async requestDevice(_opts) { throw new DOMException('Permission denied', 'SecurityError'); },
+      async getDevices()         { return []; },
+      addEventListener()         {},
+      removeEventListener()      {},
+    },
+    configurable: true,
+  });
+})();
+"""
+
+# Simulates a browser with no WebHID support.
+# The page gates the Fast button on `'hid' in navigator && window.isSecureContext`.
+# In Chromium, navigator.hid is non-deletable, so we can't remove it from the
+# prototype chain; instead we flip isSecureContext to false, which is the other
+# half of the gate and achieves the same result.
+_HID_UNAVAILABLE_JS = r"""
+(() => {
+  Object.defineProperty(window, 'isSecureContext', { value: false, configurable: true });
+})();
+"""
+
+
 # ─── fixtures ────────────────────────────────────────────────────────────────
 
 @pytest.fixture
@@ -331,3 +360,83 @@ async def test_outbound_chunking_uses_63_byte_payloads(page_with_mock):
         assert len(r["data"]) == 63
         n = r["data"][0]
         assert 0 <= n <= 62
+
+
+# ─── fallback / unavailability tests ─────────────────────────────────────────
+
+@pytest.fixture
+async def page_no_hid(gateway_and_echo, browser):
+    """A page where navigator.hid is absent (WebHID not supported)."""
+    gw_url, _echo = gateway_and_echo
+    ctx = await browser.new_context(viewport={"width": 1280, "height": 800})
+    await ctx.add_init_script(_HID_UNAVAILABLE_JS)
+    p = await ctx.new_page()
+    await p.goto(gw_url)
+    await p.wait_for_timeout(800)
+    yield p
+    await p.close()
+    await ctx.close()
+
+
+@pytest.fixture
+async def page_hid_denied(gateway_and_echo, browser):
+    """A page where navigator.hid exists but requestDevice() rejects."""
+    gw_url, _echo = gateway_and_echo
+    ctx = await browser.new_context(viewport={"width": 1280, "height": 800})
+    await ctx.add_init_script(_HID_PERMISSION_DENIED_JS)
+    p = await ctx.new_page()
+    await p.goto(gw_url)
+    await p.wait_for_timeout(800)
+    yield p
+    await p.close()
+    await ctx.close()
+
+
+@pytest.mark.asyncio
+async def test_fast_button_hidden_when_hid_absent(page_no_hid):
+    """Fast pill must not be shown when the browser has no WebHID support."""
+    visible = await page_no_hid.evaluate(
+        "document.getElementById('fast-btn').classList.contains('available')"
+    )
+    assert visible is False
+
+
+@pytest.mark.asyncio
+async def test_standard_mode_active_when_hid_absent(page_no_hid):
+    """QR canvas must be visible and the page stays in standard mode."""
+    state = await page_no_hid.evaluate("""({
+        canvasDisplay: getComputedStyle(document.getElementById('qr-canvas')).display,
+        transport:     typeof transport !== 'undefined' ? transport : null,
+    })""")
+    assert state["canvasDisplay"] != "none"
+    assert state["transport"] is None
+
+
+@pytest.mark.asyncio
+async def test_permission_denied_leaves_standard_mode_intact(page_hid_denied):
+    """Clicking Fast when requestDevice() rejects must not break standard mode."""
+    await page_hid_denied.click("#fast-btn")
+    await page_hid_denied.wait_for_timeout(300)
+
+    state = await page_hid_denied.evaluate("""({
+        transport:   typeof transport !== 'undefined' ? transport : null,
+        btnActive:   document.getElementById('fast-btn').classList.contains('active'),
+        qrVisible:   document.getElementById('qr-canvas').style.display !== 'none',
+    })""")
+    # Transport must not have been set — no device was granted.
+    assert state["transport"] is None
+    assert state["btnActive"] is False
+    # Standard QR path must still be running.
+    assert state["qrVisible"] is True
+
+
+@pytest.mark.asyncio
+async def test_splice_stats_message_received(page_with_mock):
+    """Gateway sends splice_stats JSON text frames; page must not crash on them."""
+    errors: list[str] = []
+    page_with_mock.on("pageerror", lambda e: errors.append(str(e)))
+
+    # Wait long enough for at least one stats tick (_STATS_INTERVAL_SECS = 1 s).
+    await page_with_mock.wait_for_timeout(1400)
+
+    assert errors == [], f"page errors after splice_stats: {errors}"
