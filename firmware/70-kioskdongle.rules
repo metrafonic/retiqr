@@ -1,0 +1,13 @@
+# Grant the logged-in user access to the KioskDongle's HID interfaces.
+# Required so Chrome/Edge WebHID can open /dev/hidraw* for the vendor HID
+# interface. The kernel usbhid driver still claims the keyboard collection;
+# WebHID only sees the vendor (usage page 0xFF00) one because of its filters.
+#
+# Install:
+#   sudo cp 70-kioskdongle.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules && sudo udevadm trigger
+#
+# Then replug the dongle.
+
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="303a", ATTRS{idProduct}=="1001", ATTRS{product}=="KioskDongle", TAG+="uaccess", MODE="0660", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="303a", ATTRS{idProduct}=="1001", ATTRS{product}=="KioskDongle", TAG+="uaccess", MODE="0660", GROUP="plugdev"
