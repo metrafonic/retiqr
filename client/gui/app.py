@@ -91,19 +91,6 @@ class _MainWindow:
         self._up_info  = QLabel("TX: —")
         self._up_info.setStyleSheet("color: #888;")
 
-        from PySide6.QtWidgets import QComboBox
-        self._mode_combo = QComboBox()
-        self._mode_combo.addItem("Standard", "legacy")
-        self._mode_combo.addItem("⚗ WebHID", "webhid")
-        self._mode_combo.setCurrentIndex(0 if mode == "legacy" else 1)
-        self._mode_combo.setToolTip("Switch transport mode (Standard: QR+keyboard · WebHID: direct vendor HID via BLE/Wi-Fi)")
-        self._mode_combo.setStyleSheet(
-            "QComboBox { background:#1e1e1e; color:#888; border:1px solid #333;"
-            " padding:0 6px; font-size:11px; }"
-            "QComboBox::drop-down { border:none; }"
-        )
-        self._mode_combo.activated.connect(self._on_mode_combo_changed)
-
         conn_bar = QWidget()
         conn_bar.setFixedHeight(28)
         conn_bar.setStyleSheet("background: #1a1a1a;")
@@ -116,7 +103,6 @@ class _MainWindow:
         bar_layout.addWidget(self._up_dot)
         bar_layout.addWidget(self._up_info)
         bar_layout.addStretch()
-        bar_layout.addWidget(self._mode_combo)
         layout.addWidget(conn_bar)
         layout.addWidget(self._view)
 
@@ -161,66 +147,6 @@ class _MainWindow:
 
     def show(self):
         self._win.show()
-
-    # ── mode switching ────────────────────────────────────────────────────────
-
-    def _on_mode_combo_changed(self, index: int):
-        new_mode = self._mode_combo.itemData(index)
-        if new_mode != self._mode:
-            self._apply_mode_switch(new_mode)
-
-    def _apply_mode_switch(self, new_mode: str):
-        from framing import hid_encode, hid_report_chunks
-
-        old_mode = self._mode
-        self._mode = new_mode
-        log.info("Mode switch: %s → %s", old_mode, new_mode)
-
-        if new_mode == "webhid":
-            # Stop camera if running
-            if self._camera:
-                self._camera.stop()
-                self._camera = None
-            self._view.setText("⚗ WebHID (Experimental)")
-
-            # Swap bridge callbacks to raw-splice path
-            def on_tx_raw(chunk: bytes):
-                if not chunk:
-                    return
-                reports = hid_report_chunks(chunk)
-                if reports:
-                    self._tx_count += 1
-                    self._ble.send_raw(b"".join(reports))
-            self._bridge.on_tx_packet = None
-            self._bridge.on_tx_raw = on_tx_raw
-
-            # Wire BLE inbound path
-            def on_rx_raw(stream: bytes):
-                self._rx_count += 1
-                if self._bridge:
-                    self._bridge.put_rx_raw(stream)
-            self._ble.on_rx_raw = on_rx_raw
-
-        else:  # legacy
-            # Tear down WebHID callbacks first
-            self._bridge.on_tx_raw = None
-            self._ble.on_rx_raw = None
-
-            def on_tx_packet(pkt: bytes):
-                self._tx_count += 1
-                self._ble.send(hid_encode(pkt).encode())
-            self._bridge.on_tx_packet = on_tx_packet
-
-            # Restart camera (macOS: must probe from Qt main thread)
-            self._view.clear()
-            self._start_camera(self._camera_device)
-
-        # Keep combo in sync (in case called programmatically)
-        target_idx = 0 if new_mode == "legacy" else 1
-        if self._mode_combo.currentIndex() != target_idx:
-            self._mode_combo.blockSignals(True)
-            self._mode_combo.setCurrentIndex(target_idx)
-            self._mode_combo.blockSignals(False)
 
     # ── bridge ────────────────────────────────────────────────────────────────
 

@@ -82,7 +82,7 @@ Two independent mode axes:
 
 **`tx/gadget.py`** — `GadgetUplink`: writes 8-byte HID boot-protocol reports to `/dev/hidg0`. Typing runs in `loop.run_in_executor`. Only chars in HID frames have `_KEY_MAP` entries: `>` `<` `0–9` `A–F`. Modifier `0x02` = Left Shift.
 
-**`gui/app.py`** — PySide6 window. macOS: `cv2.VideoCapture(device)` must be probed and released from the Qt main thread before the camera background thread starts (triggers the permission dialog).
+**`gui/app.py`** — PySide6 window. Transport mode is fixed at startup via `--mode legacy|webhid` (no in-app switching). macOS: `cv2.VideoCapture(device)` must be probed and released from the Qt main thread before the camera background thread starts (triggers the permission dialog).
 
 ### Firmware key details
 

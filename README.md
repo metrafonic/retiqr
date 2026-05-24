@@ -17,7 +17,7 @@ Typical throughput on the standard path: ~3 kB/s down (QR), ~500 B/s up (HID). E
 | Directory | Description |
 |-----------|-------------|
 | [`gateway/`](gateway/README.md)   | Server-side: aiohttp app that serves the kiosk page and splices WebSocket ↔ Reticulum TCP |
-| [`client/`](client/README.md)     | Your-side: desktop app (Mac/Linux/Pi Zero) — webcam QR decode + BLE/HID uplink + Reticulum TCP bridge. `--mode webhid` skips the camera and uses the fast path. |
+| [`client/`](client/README.md)     | Your-side: desktop app (Mac/Linux/Pi Zero) — webcam QR decode + BLE/HID uplink + Reticulum TCP bridge. Pass `--mode webhid` to skip the camera and use the fast path. |
 | [`firmware/`](firmware/README.md) | ESP32-S3 (M5Stack AtomS3 Lite) composite USB-HID dongle: keyboard (standard) + vendor-HID (fast path) + BLE GATT |
 | `shared/`                         | `framing.py` — HDLC, HID-keyboard frame, QR-fragment, and vendor-HID-report wire formats shared by gateway and client |
 
@@ -54,7 +54,7 @@ Two independent mode axes exist:
         ↕                        for standard + vendor for fast)
    client/ (laptop)                    ↕  BLE GATT
                                   client/ (laptop)
-                              (in --mode webhid: no camera)
+                              (--mode webhid: no camera needed)
 
                        ↕ TCP/HDLC (localhost:4243)
                     Reticulum stack

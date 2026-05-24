@@ -1,6 +1,6 @@
 # client
 
-Desktop app (Mac/Linux/Pi Zero) that bridges a local Reticulum stack to the kiosk browser session via webcam QR decode (RX) and HID keyboard typing (TX).
+Desktop app (Mac/Linux/Pi Zero) that bridges a local Reticulum stack to the kiosk browser session via webcam QR decode (RX) and HID keyboard typing (TX), or via vendor-HID fast path (`--mode webhid`).
 
 ## Running
 
@@ -8,18 +8,20 @@ Desktop app (Mac/Linux/Pi Zero) that bridges a local Reticulum stack to the kios
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
 
-python main.py --uplink ble       # laptop with ESP32-S3 BLE dongle
-python main.py --uplink gadget    # Pi Zero with /dev/hidg0
-python main.py --uplink none      # development, no hardware
+python main.py --uplink ble                        # standard path (QR + keyboard)
+python main.py --uplink ble --mode webhid          # fast path (vendor-HID, no camera)
+python main.py --uplink gadget                     # Pi Zero with /dev/hidg0
+python main.py --uplink none                       # development, no hardware
 ```
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--uplink` | *(required)* | `ble`, `gadget`, or `none` |
+| `--mode` | `legacy` | `legacy` (QR + keyboard) or `webhid` (vendor-HID fast path, no camera) |
 | `--key-delay-ms` | `5` | Inter-keystroke delay sent to dongle/gadget |
 | `--gadget-device` | `/dev/hidg0` | HID gadget device path (gadget uplink only) |
 | `--bridge-port` | `4243` | TCP port for the Reticulum TCPClientInterface |
-| `--camera` | `0` | OpenCV camera device index |
+| `--camera` | `0` | OpenCV camera device index (legacy mode only) |
 
 Add to `~/.reticulum/config`:
 ```
@@ -33,7 +35,7 @@ Add to `~/.reticulum/config`:
 ## Testing
 
 ```bash
-pytest                           # 64 tests, ~1s, no hardware needed
+pytest                           # 87 tests, ~2s, no hardware needed
 pytest tests/test_bridge.py
 pytest tests/test_decoder.py
 pytest -k test_basic_round_trip
@@ -43,7 +45,7 @@ pytest -k test_basic_round_trip
 
 ### BleUplink (`--uplink ble`)
 
-Connects to the ESP32-S3 dongle (`firmware/`) via Bluetooth. Scans for `"KioskDongle"`, "Just Works" pairing (no PIN). Frames are split into 20-byte BLE chunks; the dongle reassembles them.
+Connects to the ESP32-S3 dongle (`firmware/`) via Bluetooth. Scans for `"KioskDongle"`, "Just Works" pairing (no PIN). Legacy frames split into 20-byte BLE chunks; fast-path WHID-TX writes use 63-byte chunks (one HID report body per write) after MTU negotiation.
 
 ### GadgetUplink (`--uplink gadget`)
 
