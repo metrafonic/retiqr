@@ -17,9 +17,9 @@
       --bd1: #202843;
       --bd2: #2b3655;
       --t0:  #dde3f5;
-      --t1:  #6a7a9e;
-      --t2:  #38405e;
-      --t3:  #1c2238;
+      --t1:  #8c9dc2;
+      --t2:  #505e82;
+      --t3:  #2a3350;
       --grn:      #28de78;
       --grn-glow: rgba(40, 222, 120, .32);
       --grn-bg:   rgba(40, 222, 120, .07);
@@ -123,8 +123,8 @@
       border-color: var(--bd2); border-style: solid;
       pointer-events: none; z-index: 1;
     }
-    .qr-corn.tl { top: 14px; left: 14px;   border-width: 1px 0 0 1px; }
-    .qr-corn.tr { top: 14px; right: 14px;  border-width: 1px 1px 0 0; }
+    .qr-corn.tl { top: 14px; left: 14px;    border-width: 1px 0 0 1px; }
+    .qr-corn.tr { top: 14px; right: 14px;   border-width: 1px 1px 0 0; }
     .qr-corn.bl { bottom: 14px; left: 14px;  border-width: 0 0 1px 1px; }
     .qr-corn.br { bottom: 14px; right: 14px; border-width: 0 1px 1px 0; }
 
@@ -152,6 +152,7 @@
       pointer-events: none; letter-spacing: .03em;
       border-radius: 3px;
     }
+    #webhid-invite[hidden] { display: none !important; }
 
     /* ─── WEBHID PANEL ───────────────────────────────────────── */
     #webhid-area {
@@ -219,7 +220,7 @@
       color: var(--t2); text-transform: uppercase; margin-bottom: 10px;
     }
 
-    /* stats grid — innerHTML written by updateFastStats() */
+    /* stats grid — innerHTML driven by updateFastStats() */
     #webhid-stats {
       display: grid;
       grid-template-columns: 72px 1fr 1fr;
@@ -340,6 +341,7 @@
     .stream-events {
       overflow: hidden; display: flex; flex-direction: column; padding: 3px 0;
     }
+    #rx-events { justify-content: flex-end; }
 
     .stream-event {
       display: flex; align-items: center; gap: 6px; padding: 2px 8px;
@@ -401,11 +403,11 @@
     <div class="qr-corn bl"></div>
     <div class="qr-corn br"></div>
     <canvas id="qr-canvas"></canvas>
-    <div id="idle-msg">waiting for data…</div>
+    <div id="idle-msg">waiting for data&#8230;</div>
 
     <div id="webhid-invite" hidden>
       <span class="exp-badge">EXPERIMENTAL</span>
-      WebHID available — click <b>Try WebHID</b> in the status bar
+      WebHID available &#8212; click <b>Enable WebHID Mode</b> in the status bar
     </div>
 
     <div id="webhid-area">
@@ -413,8 +415,8 @@
       <div id="webhid-header">
         <span class="exp-badge">EXPERIMENTAL</span>
         <span id="webhid-header-title">WebHID Direct Mode</span>
-        <div id="webhid-device">—</div>
-        <button id="webhid-exit-btn" type="button">← Standard</button>
+        <div id="webhid-device">&#8212;</div>
+        <button id="webhid-exit-btn" type="button">&#8592; Standard</button>
       </div>
 
       <div id="webhid-content">
@@ -423,7 +425,7 @@
 
           <div class="webhid-card">
             <div class="card-label">Throughput</div>
-            <div id="webhid-stats">—</div>
+            <div id="webhid-stats">&#8212;</div>
           </div>
 
           <div class="webhid-card">
@@ -456,58 +458,61 @@
               <div class="row">
                 <button id="peer-apply-btn" type="button">Apply + Reboot</button>
               </div>
-              <div id="webhid-config-status">—</div>
+              <div id="webhid-config-status">&#8212;</div>
             </div>
           </div>
 
-        </div><!-- #webhid-top-row -->
+        </div>
 
         <details id="webhid-guide">
           <summary>Setup &amp; Test Guide</summary>
           <div class="guide-body">
 
             <div class="guide-h">Prerequisites</div>
-            <div class="guide-step"><span class="guide-n">·</span><span>Chrome, Edge, or Opera — Firefox and Safari do not support WebHID</span></div>
-            <div class="guide-step"><span class="guide-n">·</span><span>Page must be on <code>localhost</code> or HTTPS (secure context required)</span></div>
-            <div class="guide-step"><span class="guide-n">·</span><span>KioskDongle connected to this computer via USB-C</span></div>
+            <div class="guide-step"><span class="guide-n">&#183;</span><span>Chrome, Edge, or Opera &#8212; Firefox and Safari do not support WebHID</span></div>
+            <div class="guide-step"><span class="guide-n">&#183;</span><span>Page must be on <code>localhost</code> or HTTPS (secure context required)</span></div>
+            <div class="guide-step"><span class="guide-n">&#183;</span><span>KioskDongle connected to this computer via USB-C</span></div>
 
             <div class="guide-h">Connecting</div>
             <div class="guide-step"><span class="guide-n">1.</span><span>Plug the KioskDongle into a USB-C port on this computer</span></div>
-            <div class="guide-step"><span class="guide-n">2.</span><span>Click <b>Try WebHID</b> in the status bar — the amber glow indicates it is available</span></div>
+            <div class="guide-step"><span class="guide-n">2.</span><span>Click <b>Enable WebHID Mode</b> in the status bar &#8212; the amber glow indicates it is available</span></div>
             <div class="guide-step"><span class="guide-n">3.</span><span>Select <b>KioskDongle</b> in the browser device chooser and click <b>Connect</b></span></div>
-            <div class="guide-step"><span class="guide-n">4.</span><span>The device name turns green and live stats appear — you are connected</span></div>
+            <div class="guide-step"><span class="guide-n">4.</span><span>The device name turns green and live stats appear &#8212; you are connected</span></div>
 
             <div class="guide-h">Verifying Data Flow</div>
-            <div class="guide-step"><span class="guide-n">·</span><span><b>RX (Reticulum → kiosk):</b> Gateway KiB/s shows non-zero when Reticulum sends data</span></div>
-            <div class="guide-step"><span class="guide-n">·</span><span><b>TX (kiosk → Reticulum):</b> HID rpt/s goes non-zero; client app status bar turns green</span></div>
-            <div class="guide-step"><span class="guide-n">·</span><span>Green RX bars and blue TX bars in the right sidebar animate on traffic</span></div>
+            <div class="guide-step"><span class="guide-n">&#183;</span><span><b>RX (Reticulum &#8594; kiosk):</b> Gateway KiB/s shows non-zero when Reticulum sends data</span></div>
+            <div class="guide-step"><span class="guide-n">&#183;</span><span><b>TX (kiosk &#8594; Reticulum):</b> HID rpt/s goes non-zero; client app status bar turns green</span></div>
+            <div class="guide-step"><span class="guide-n">&#183;</span><span>Green RX bars and blue TX bars in the right sidebar animate on traffic</span></div>
 
             <div class="guide-h">Peer Link Modes</div>
             <div class="guide-step"><span class="guide-n">BLE</span><span>&nbsp;Dongle relays via Bluetooth LE to the client laptop. Run: <code>python main.py --uplink ble --mode webhid</code></span></div>
-            <div class="guide-step"><span class="guide-n">Wi‑Fi</span><span>&nbsp;Dongle hosts its own AP — no laptop needed. Set SSID &amp; password above, click Apply + Reboot, then connect to the dongle's Wi-Fi AP and run: <code>python main.py --uplink none</code></span></div>
+            <div class="guide-step"><span class="guide-n">Wi&#8209;Fi</span><span>&nbsp;Dongle hosts its own Wi-Fi AP — no laptop needed.</span></div>
+            <div class="guide-step"><span class="guide-n">&nbsp;1.</span><span>Set SSID &amp; password in the fields above, click <b>Apply + Reboot</b>, then connect your computer to the dongle&#8217;s Wi-Fi network.</span></div>
+            <div class="guide-step"><span class="guide-n">&nbsp;2.</span><span>Add a <code>[[TCPClientInterface]]</code> entry to <code>~/.reticulum/config</code> pointing at the dongle&#8217;s fixed IP:<br><code>[[TCPClientInterface]]<br>&nbsp;&nbsp;target_host = 10.77.0.1<br>&nbsp;&nbsp;target_port = 4243</code></span></div>
+            <div class="guide-step"><span class="guide-n">&nbsp;3.</span><span>No client app needed — Reticulum connects directly to the dongle over Wi-Fi.</span></div>
 
             <div class="guide-h">Troubleshooting</div>
-            <div class="guide-step"><span class="guide-n">·</span><span><b>Button greyed out</b> — browser lacks WebHID support. Use Chrome or Edge on desktop.</span></div>
-            <div class="guide-step"><span class="guide-n">·</span><span><b>Empty device chooser</b> — check USB cable; try unplugging and reconnecting the dongle.</span></div>
-            <div class="guide-step"><span class="guide-n">·</span><span><b>Stats stuck at zero</b> — confirm Reticulum is running and the client app is up on port 4243.</span></div>
-            <div class="guide-step"><span class="guide-n">·</span><span><b>Device keeps disconnecting</b> — use a direct USB port; powered hubs can drop vendor HID devices.</span></div>
+            <div class="guide-step"><span class="guide-n">&#183;</span><span><b>Button greyed out</b> &#8212; browser lacks WebHID support. Use Chrome or Edge on desktop.</span></div>
+            <div class="guide-step"><span class="guide-n">&#183;</span><span><b>Empty device chooser</b> &#8212; check USB cable; try unplugging and reconnecting the dongle.</span></div>
+            <div class="guide-step"><span class="guide-n">&#183;</span><span><b>Stats stuck at zero</b> &#8212; confirm Reticulum is running and the client app is up on port 4243.</span></div>
+            <div class="guide-step"><span class="guide-n">&#183;</span><span><b>Device keeps disconnecting</b> &#8212; use a direct USB port; powered hubs can drop vendor HID devices.</span></div>
 
-            <div class="guide-warn">⚠ This mode is experimental. Data loss may occur under heavy load or marginal BLE links. Standard QR mode remains available at any time via ← Standard.</div>
+            <div class="guide-warn">&#9888; This mode is experimental. Data loss may occur under heavy load or marginal BLE links. Standard QR mode remains available at any time via &#8592; Standard.</div>
 
           </div>
         </details>
 
-      </div><!-- #webhid-content -->
-    </div><!-- #webhid-area -->
-  </div><!-- #qr-area -->
+      </div>
+    </div>
+  </div>
 
   <div id="sidebar">
     <div id="rx-panel">
       <div class="stream-events" id="rx-events"></div>
     </div>
     <div id="sidebar-label">
-      <span>RX ↑</span>
-      <span>TX ↓</span>
+      <span>RX &#8593;</span>
+      <span>TX &#8595;</span>
     </div>
     <div id="tx-panel">
       <div class="stream-events" id="tx-events"></div>
@@ -543,11 +548,11 @@ const CONFIG_WIFI_SSID_MAX  = 32;
 const CONFIG_WIFI_PASS_MAX  = 63;
 const DEFAULT_WIFI_AP_SSID  = 'KioskDongle';
 const DEFAULT_WIFI_AP_PASS  = 'retiqrfast';
-const CONFIG_CMD_NONE           = 0;
-const CONFIG_CMD_GET_STATUS     = 1;
+const CONFIG_CMD_NONE            = 0;
+const CONFIG_CMD_GET_STATUS      = 1;
 const CONFIG_CMD_STAGE_MODE_SSID = 2;
-const CONFIG_CMD_STAGE_PASSWORD = 3;
-const CONFIG_CMD_APPLY          = 4;
+const CONFIG_CMD_STAGE_PASSWORD  = 3;
+const CONFIG_CMD_APPLY           = 4;
 const CONFIG_STATUS_TEXT = {
   0: 'OK', 1: 'Invalid command', 2: 'Invalid peer mode',
   3: 'Invalid SSID', 4: 'Invalid password',
@@ -776,9 +781,9 @@ const fastStats = {
       wsSkipped: this.wsSkipped,
       handlerAvgMs: this.hidReportsIn ? this.handlerTotalMs / this.hidReportsIn : 0,
       handlerMaxMs: this.handlerMaxMs, handlerOver1Ms: this.handlerOver1Ms,
-      reportsPerSec:      this.hidReportsIn * 1000 / elapsedMs,
-      hidKiBsPerSec:      this.hidBytesIn / 1024 * 1000 / elapsedMs,
-      wsKiBsPerSec:       this.wsBytesOut / 1024 * 1000 / elapsedMs,
+      reportsPerSec:       this.hidReportsIn * 1000 / elapsedMs,
+      hidKiBsPerSec:       this.hidBytesIn / 1024 * 1000 / elapsedMs,
+      wsKiBsPerSec:        this.wsBytesOut / 1024 * 1000 / elapsedMs,
       activeReportsPerSec: reportWindowMs ? this.hidReportsIn * 1000 / reportWindowMs : 0,
       activeHidKiBsPerSec: reportWindowMs ? this.hidBytesIn / 1024 * 1000 / reportWindowMs : 0,
       activeWsKiBsPerSec:  sendWindowMs ? this.wsBytesOut / 1024 * 1000 / sendWindowMs : 0,
@@ -834,7 +839,7 @@ const bridgeStats = {
     this.lastUpdateMs = 0; this.lastNonZeroUpdateMs = 0;
   },
   note(payload) {
-    this.upKiBsPerSec   = payload.up_kibps   || 0;
+    this.upKiBsPerSec   = payload.up_kibps  || 0;
     this.downKiBsPerSec = payload.down_kibps || 0;
     if (this.upKiBsPerSec > 0 || this.downKiBsPerSec > 0) {
       this.lastNonZeroUpKiBsPerSec   = this.upKiBsPerSec;
@@ -1052,10 +1057,10 @@ class WebHidTransport {
 // ─── peer-config helpers ─────────────────────────────────────────────────────
 
 function decodePeerConfig(dataView) {
-  const buf    = new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
+  const buf     = new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
   const ssidLen = Math.min(buf[4] || 0, CONFIG_WIFI_SSID_MAX);
   return {
-    version:       buf[0] || 0,
+    version:        buf[0] || 0,
     configuredMode: buf[1] === 1 ? 'wifi-ap' : 'ble',
     activeMode:     buf[2] === 1 ? 'wifi-ap' : 'ble',
     statusCode:     buf[3] || 0,
@@ -1084,20 +1089,20 @@ function applyPeerConfigToUi(config) {
 
 // ─── DOM refs ────────────────────────────────────────────────────────────────
 
-const fastBtn          = document.getElementById('fast-btn');
-const webhidArea       = document.getElementById('webhid-area');
-const webhidDevice     = document.getElementById('webhid-device');
-const webhidStats      = document.getElementById('webhid-stats');
-const webhidInvite     = document.getElementById('webhid-invite');
-const peerModeSelect   = document.getElementById('peer-mode-select');
-const wifiSsidRow      = document.getElementById('wifi-ssid-row');
-const wifiPassRow      = document.getElementById('wifi-pass-row');
-const wifiSsidInput    = document.getElementById('wifi-ssid-input');
-const wifiPassInput    = document.getElementById('wifi-pass-input');
-const wifiPassToggle   = document.getElementById('wifi-pass-toggle');
-const peerApplyBtn     = document.getElementById('peer-apply-btn');
+const fastBtn            = document.getElementById('fast-btn');
+const webhidArea         = document.getElementById('webhid-area');
+const webhidDevice       = document.getElementById('webhid-device');
+const webhidStats        = document.getElementById('webhid-stats');
+const webhidInvite       = document.getElementById('webhid-invite');
+const peerModeSelect     = document.getElementById('peer-mode-select');
+const wifiSsidRow        = document.getElementById('wifi-ssid-row');
+const wifiPassRow        = document.getElementById('wifi-pass-row');
+const wifiSsidInput      = document.getElementById('wifi-ssid-input');
+const wifiPassInput      = document.getElementById('wifi-pass-input');
+const wifiPassToggle     = document.getElementById('wifi-pass-toggle');
+const peerApplyBtn       = document.getElementById('peer-apply-btn');
 const webhidConfigStatus = document.getElementById('webhid-config-status');
-const qrCanvas         = document.getElementById('qr-canvas');
+const qrCanvas           = document.getElementById('qr-canvas');
 let peerConfigRequestSeq = 0;
 
 function setPeerConfigStatus(text) { webhidConfigStatus.textContent = text || '—'; }
@@ -1142,7 +1147,7 @@ function setFastMode(active, device) {
     webhidArea.classList.remove('active');
     qrCanvas.style.display = '';
     fastBtn.classList.remove('active');
-    fastBtn.textContent = 'Try WebHID';
+    fastBtn.textContent = 'Enable WebHID Mode';
     if (webhidInvite) webhidInvite.hidden = false;
     webhidDevice.textContent = '—';
     webhidStats.innerHTML    = '—';
@@ -1234,7 +1239,7 @@ async function connectFastPath() {
 if ('hid' in navigator && window.isSecureContext) {
   fastBtn.disabled = false;
   fastBtn.classList.add('available');
-  fastBtn.textContent = 'Try WebHID';
+  fastBtn.textContent = 'Enable WebHID Mode';
   if (webhidInvite) webhidInvite.hidden = false;
 
   fastBtn.addEventListener('click', connectFastPath);
