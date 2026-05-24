@@ -35,25 +35,23 @@ log = logging.getLogger(__name__)
 class KioskApp:
     """Thin wrapper — instantiate, call run()."""
 
-    def __init__(self, bridge_port: int = 4243, camera_device: int = 0, uplink=None,
-                 mode: str = "legacy"):
+    def __init__(self, bridge_port: int = 4243, camera_device: int = 0, uplink=None):
         self._bridge_port = bridge_port
         self._camera_device = camera_device
         self._uplink = uplink
-        self._mode = mode  # "legacy" (the standard camera+keyboard path) or "webhid" (vendor HID)
 
     def run(self):
         import sys
         from PySide6.QtWidgets import QApplication
 
         app = QApplication(sys.argv)
-        window = _MainWindow(self._bridge_port, self._camera_device, self._uplink, self._mode)
+        window = _MainWindow(self._bridge_port, self._camera_device, self._uplink)
         window.show()
         sys.exit(app.exec())
 
 
 class _MainWindow:
-    def __init__(self, bridge_port: int, camera_device: int, uplink=None, mode: str = "legacy"):
+    def __init__(self, bridge_port: int, camera_device: int, uplink=None):
         from PySide6.QtCore import Qt, QTimer
         from PySide6.QtGui import QImage, QPixmap
         from PySide6.QtWidgets import (
@@ -63,7 +61,6 @@ class _MainWindow:
         self._QImage = QImage
         self._QPixmap = QPixmap
         self._Qt = Qt
-        self._mode = mode
 
         self._win = QMainWindow()
         self._win.setWindowTitle("Reticulum Kiosk Bridge")
@@ -74,7 +71,7 @@ class _MainWindow:
         layout.setContentsMargins(0, 0, 0, 0)
         self._win.setCentralWidget(central)
 
-        self._view = QLabel("no camera" if mode == "legacy" else "Fast path (WebHID)")
+        self._view = QLabel("no camera")
         self._view.setAlignment(Qt.AlignCenter)
         self._view.setStyleSheet("background: #111; color: #555;")
         from PySide6.QtGui import QFontDatabase
@@ -139,11 +136,7 @@ class _MainWindow:
         self._timer.start()
 
         self._start_bridge(bridge_port, uplink)
-        if self._mode == "legacy":
-            self._start_camera(camera_device)
-        else:
-            log.info("webhid mode: skipping camera startup")
-            self._camera = None
+        self._start_camera(camera_device)
 
     def show(self):
         self._win.show()
@@ -152,40 +145,17 @@ class _MainWindow:
 
     def _start_bridge(self, port: int, uplink=None):
         from bridge import Bridge
-        from framing import hid_encode, hid_report_chunks
+        from framing import hid_encode
         from tx.ble import NullUplink
 
         self._ble = uplink if uplink is not None else NullUplink()
         self._bridge = Bridge(port=port)
 
-        if self._mode == "legacy":
-            # Legacy: decoded packets -> ">HEX<CC<" frames -> typed keystrokes
-            def on_tx_packet(pkt: bytes):
-                self._tx_count += 1
-                self._ble.send(hid_encode(pkt).encode())
-            self._bridge.on_tx_packet = on_tx_packet
-        else:
-            # Fast path: raw HDLC byte stream -> fixed-size vendor HID report bodies -> vendor HID
-            def on_tx_raw(chunk: bytes):
-                # Pre-chunk into HID_REPORT_SIZE-byte report bodies here so
-                # the BLE side is just dumb byte forwarding. hid_report_chunks
-                # returns a list of fixed-size buffers; we concat and pass
-                # them to send_raw as one stream (BleUplink chunks to ATT MTU).
-                if not chunk:
-                    return
-                reports = hid_report_chunks(chunk)
-                if reports:
-                    self._tx_count += 1
-                    self._ble.send_raw(b"".join(reports))
-            self._bridge.on_tx_raw = on_tx_raw
+        def on_tx(pkt: bytes):
+            self._tx_count += 1
+            self._ble.send(hid_encode(pkt).encode())
 
-            # And the inbound direction: BLE WHID-RX notifications -> bridge
-            # -> straight onto the Reticulum socket (already HDLC-framed).
-            def on_rx_raw(stream: bytes):
-                self._rx_count += 1
-                if self._bridge:
-                    self._bridge.put_rx_raw(stream)
-            self._ble.on_rx_raw = on_rx_raw
+        self._bridge.on_tx_packet = on_tx
 
         def _run():
             loop = asyncio.new_event_loop()

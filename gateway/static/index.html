@@ -153,115 +153,6 @@
       flex-shrink: 0;
     }
 
-    /* ── webhid overlay ── */
-    #webhid-area {
-      position: absolute;
-      inset: 0;
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 18px;
-      color: #2a6;
-      font-size: 16px;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      pointer-events: none;
-    }
-    #webhid-area.active { display: flex; }
-    #webhid-area .sub {
-      color: #555;
-      font-size: 11px;
-      letter-spacing: 0.04em;
-      text-transform: none;
-    }
-    #webhid-controls {
-      pointer-events: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      min-width: 320px;
-      padding: 14px;
-      border: 1px solid #1f3a2a;
-      background: rgba(8, 16, 12, 0.92);
-      color: #b8d7c0;
-      letter-spacing: normal;
-      text-transform: none;
-      font-size: 12px;
-    }
-    #webhid-controls .row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    #webhid-controls label {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      flex: 1;
-      color: #8cab93;
-    }
-    #webhid-controls select,
-    #webhid-controls input {
-      width: 100%;
-      background: #0d1410;
-      border: 1px solid #294431;
-      color: #d4ead8;
-      padding: 6px 8px;
-      font: inherit;
-    }
-    #webhid-controls button {
-      background: transparent;
-      border: 1px solid #2a6;
-      color: #8fd0a1;
-      padding: 6px 10px;
-      font: inherit;
-      cursor: pointer;
-    }
-    #webhid-controls button:hover {
-      background: rgba(42, 102, 60, 0.15);
-    }
-    #webhid-controls button:disabled {
-      opacity: 0.45;
-      cursor: default;
-    }
-    #webhid-controls .input-with-action {
-      display: flex;
-      gap: 8px;
-      align-items: stretch;
-    }
-    #webhid-controls .input-with-action input {
-      flex: 1;
-    }
-    #webhid-controls .input-with-action button {
-      flex-shrink: 0;
-      min-width: 68px;
-    }
-    .wifi-only[hidden] {
-      display: none !important;
-    }
-    #webhid-config-status {
-      min-height: 1.2em;
-      color: #6e8d76;
-    }
-
-    /* "Fast" pill button — only shown when navigator.hid is present */
-    #fast-btn {
-      background: transparent;
-      border: 1px solid #2a6;
-      color: #2a6;
-      padding: 2px 10px;
-      font: inherit;
-      cursor: pointer;
-      letter-spacing: 0.06em;
-      border-radius: 2px;
-      display: none;
-    }
-    #fast-btn.available  { display: inline-block; }
-    #fast-btn.active     { background: #2a6; color: #0a0a0a; }
-    #fast-btn:hover      { background: rgba(42, 102, 60, 0.15); }
-    #fast-btn.active:hover { background: #248; color: #0a0a0a; }
-
     /* Invisible but focusable input — positioned off-screen rather than
        display:none so kiosk browsers still allow focus */
     #hid-input {
@@ -290,7 +181,6 @@
     <span>TX <span id="tx-count">0</span></span>
   </div>
   <span>queue <span id="queue-len">0</span></span>
-  <button id="fast-btn" type="button" title="Use WebHID direct transport (requires the dongle plugged into this kiosk)">Fast</button>
   <span style="margin-left:auto; color:#555" id="seq-disp">seq —</span>
 </div>
 
@@ -298,41 +188,6 @@
   <div id="qr-area">
     <canvas id="qr-canvas"></canvas>
     <div id="idle-msg">waiting for data…</div>
-    <div id="webhid-area">
-      <div>⚡ Fast path active</div>
-      <div class="sub" id="webhid-device">—</div>
-      <div class="sub" id="webhid-stats">—</div>
-      <div id="webhid-controls">
-        <div class="row">
-          <label>
-            Peer link
-            <select id="peer-mode-select">
-              <option value="ble">BLE</option>
-              <option value="wifi-ap">Wi-Fi AP</option>
-            </select>
-          </label>
-        </div>
-        <div class="row wifi-only" id="wifi-ssid-row" hidden>
-          <label>
-            Wi-Fi SSID
-            <input id="wifi-ssid-input" type="text" maxlength="32" autocomplete="off" spellcheck="false">
-          </label>
-        </div>
-        <div class="row wifi-only" id="wifi-pass-row" hidden>
-          <label>
-            Wi-Fi password
-            <div class="input-with-action">
-              <input id="wifi-pass-input" type="password" maxlength="63" autocomplete="off" spellcheck="false">
-              <button id="wifi-pass-toggle" type="button" aria-pressed="false">Show</button>
-            </div>
-          </label>
-        </div>
-        <div class="row">
-          <button id="peer-apply-btn" type="button">Apply + Reboot</button>
-        </div>
-        <div id="webhid-config-status">—</div>
-      </div>
-    </div>
   </div>
 
   <div id="sidebar">
@@ -364,45 +219,6 @@
 
 <script>
 "use strict";
-
-// ─── packet/HID-report constants (mirror shared/framing.py) ─────────────────
-const FRAME_MS              = 200;   // ms per QR frame — tune to camera decode speed
-const MAX_QR_CHUNK          = 80;    // max packet bytes per QR frame (matches framing.py)
-const HID_REPORT_SIZE       = 63;    // vendor-HID report length, bytes
-                                      // (TinyUSB EP buffer is 64 and the OS
-                                      // prepends the Report ID byte, so the
-                                      // descriptor carries 63 data bytes)
-const HID_REPORT_PAYLOAD_MAX = HID_REPORT_SIZE - 1;
-// Espressif's official USB Vendor ID — used as the WebHID filter
-const ESP_VENDOR_ID         = 0x303A;
-// Vendor-defined HID usage page on the dongle — matches firmware
-const VENDOR_USAGE_PAGE     = 0xFF00;
-// Report ID declared in the vendor-HID descriptor (firmware/main.cpp:
-// HID_REPORT_ID_VENDOR). The descriptor uses Report IDs, so sendReport()
-// must pass this ID rather than 0.
-const VENDOR_REPORT_ID      = 6;
-const CONFIG_REPORT_ID      = 7;
-const CONFIG_REPORT_SIZE    = 63;
-const CONFIG_WIFI_SSID_MAX  = 32;
-const CONFIG_WIFI_PASS_MAX  = 63;
-const DEFAULT_WIFI_AP_SSID  = 'KioskDongle';
-const DEFAULT_WIFI_AP_PASS  = 'retiqrfast';
-const CONFIG_CMD_NONE       = 0;
-const CONFIG_CMD_GET_STATUS = 1;
-const CONFIG_CMD_STAGE_MODE_SSID = 2;
-const CONFIG_CMD_STAGE_PASSWORD = 3;
-const CONFIG_CMD_APPLY      = 4;
-const CONFIG_STATUS_TEXT = {
-  0: 'OK',
-  1: 'Invalid command',
-  2: 'Invalid peer mode',
-  3: 'Invalid SSID',
-  4: 'Invalid password',
-};
-const peerConfigCodec = {
-  enc: new TextEncoder(),
-  dec: new TextDecoder(),
-};
 
 // ─── HDLC (Reticulum TCP interface framing) ──────────────────────────────────
 
@@ -570,6 +386,8 @@ function addEvent(containerId, bytes, barClass) {
 const queue       = [];
 let   txSeq       = 0;
 let   idle        = true;
+const FRAME_MS    = 200;   // ms per QR frame — tune to camera decode speed
+const MAX_QR_CHUNK = 80;   // max packet bytes per QR frame (matches framing.py)
 
 function enqueuePacket(packet) {
   const chunks = [];
@@ -613,184 +431,17 @@ setInterval(() => {
 }, 1000);
 
 // ─── WebSocket ───────────────────────────────────────────────────────────────
-//
-// Two transports share the WebSocket. When `transport === null` we're in
-// LEGACY mode: incoming binary bytes are HDLC-parsed into packets, each
-// packet is enqueued for QR rendering; outgoing keystrokes from the textarea
-// are HID-frame-parsed into packets, HDLC-re-encoded, and written to the WS.
-//
-// When `transport` is set to a WebHidTransport we're in FAST PATH: bytes are
-// spliced *raw* in both directions. The dongle hands the laptop client an
-// already-HDLC byte stream (the same bytes the gateway pushed onto the WS)
-// and vice versa — there is no packet-level processing on the page at all.
-// This mirrors what the upstream gateway already does: a protocol-blind splice.
 
-let transport = null;
-let ws        = null;
-let rxCount   = 0;
-let txCount   = 0;
+let ws       = null;
+let rxCount  = 0;
+let txCount  = 0;
 let pendingRxBytes = 0;
 let pendingTxBytes = 0;
-
-const fastStats = {
-  reset() {
-    this.startedAtMs = performance.now();
-    this.firstReportAtMs = 0;
-    this.lastReportAtMs = 0;
-    this.prevReportAtMs = 0;
-    this.firstSendAtMs = 0;
-    this.lastSendAtMs = 0;
-    this.hidReportsIn = 0;
-    this.hidBytesIn = 0;
-    this.wsSendsOut = 0;
-    this.wsBytesOut = 0;
-    this.wsSkipped = 0;
-    this.handlerTotalMs = 0;
-    this.handlerMaxMs = 0;
-    this.handlerOver1Ms = 0;
-    this.wsBufferedBeforeMax = 0;
-    this.wsBufferedAfterMax = 0;
-    this.wsBufferedGrowthEvents = 0;
-    this.wsBufferedGrowthBytes = 0;
-    this.reportGapTotalMs = 0;
-    this.reportGapMaxMs = 0;
-    this.reportGapOver2Ms = 0;
-    this.reportGapOver5Ms = 0;
-  },
-  snapshot() {
-    const now = performance.now();
-    const elapsedMs = Math.max(now - this.startedAtMs, 1);
-    const reportWindowMs = this.firstReportAtMs
-      ? Math.max((this.lastReportAtMs || now) - this.firstReportAtMs, 1)
-      : 0;
-    const sendWindowMs = this.firstSendAtMs
-      ? Math.max((this.lastSendAtMs || now) - this.firstSendAtMs, 1)
-      : 0;
-    return {
-      elapsedMs,
-      reportWindowMs,
-      sendWindowMs,
-      hidReportsIn: this.hidReportsIn,
-      hidBytesIn: this.hidBytesIn,
-      wsSendsOut: this.wsSendsOut,
-      wsBytesOut: this.wsBytesOut,
-      wsSkipped: this.wsSkipped,
-      handlerAvgMs: this.hidReportsIn ? this.handlerTotalMs / this.hidReportsIn : 0,
-      handlerMaxMs: this.handlerMaxMs,
-      handlerOver1Ms: this.handlerOver1Ms,
-      reportsPerSec: this.hidReportsIn * 1000 / elapsedMs,
-      hidKiBsPerSec: this.hidBytesIn / 1024 * 1000 / elapsedMs,
-      wsKiBsPerSec: this.wsBytesOut / 1024 * 1000 / elapsedMs,
-      activeReportsPerSec: reportWindowMs ? this.hidReportsIn * 1000 / reportWindowMs : 0,
-      activeHidKiBsPerSec: reportWindowMs ? this.hidBytesIn / 1024 * 1000 / reportWindowMs : 0,
-      activeWsKiBsPerSec: sendWindowMs ? this.wsBytesOut / 1024 * 1000 / sendWindowMs : 0,
-      avgPayloadBytes: this.hidReportsIn ? this.hidBytesIn / this.hidReportsIn : 0,
-      reportGapAvgMs: this.hidReportsIn > 1 ? this.reportGapTotalMs / (this.hidReportsIn - 1) : 0,
-      reportGapMaxMs: this.reportGapMaxMs,
-      reportGapOver2Ms: this.reportGapOver2Ms,
-      reportGapOver5Ms: this.reportGapOver5Ms,
-      wsBufferedBeforeMax: this.wsBufferedBeforeMax,
-      wsBufferedAfterMax: this.wsBufferedAfterMax,
-      wsBufferedGrowthEvents: this.wsBufferedGrowthEvents,
-      wsBufferedGrowthBytes: this.wsBufferedGrowthBytes,
-    };
-  },
-  noteInputReport(payloadBytes, handlerMs, bufferedBefore, bufferedAfter, sent) {
-    const now = performance.now();
-    if (!this.firstReportAtMs) this.firstReportAtMs = now;
-    if (this.prevReportAtMs) {
-      const gapMs = now - this.prevReportAtMs;
-      this.reportGapTotalMs += gapMs;
-      if (gapMs > this.reportGapMaxMs) this.reportGapMaxMs = gapMs;
-      if (gapMs >= 2) this.reportGapOver2Ms += 1;
-      if (gapMs >= 5) this.reportGapOver5Ms += 1;
-    }
-    this.prevReportAtMs = now;
-    this.lastReportAtMs = now;
-    this.hidReportsIn += 1;
-    this.hidBytesIn += payloadBytes;
-    this.handlerTotalMs += handlerMs;
-    if (handlerMs > this.handlerMaxMs) this.handlerMaxMs = handlerMs;
-    if (handlerMs >= 1) this.handlerOver1Ms += 1;
-    if (bufferedBefore > this.wsBufferedBeforeMax) this.wsBufferedBeforeMax = bufferedBefore;
-    if (bufferedAfter > this.wsBufferedAfterMax) this.wsBufferedAfterMax = bufferedAfter;
-    if (bufferedAfter > bufferedBefore) {
-      this.wsBufferedGrowthEvents += 1;
-      this.wsBufferedGrowthBytes += bufferedAfter - bufferedBefore;
-    }
-    if (sent) {
-      if (!this.firstSendAtMs) this.firstSendAtMs = now;
-      this.lastSendAtMs = now;
-      this.wsSendsOut += 1;
-      this.wsBytesOut += payloadBytes;
-    } else {
-      this.wsSkipped += 1;
-    }
-  },
-};
-fastStats.reset();
-const bridgeStats = {
-  reset() {
-    this.upKiBsPerSec = 0;
-    this.downKiBsPerSec = 0;
-    this.lastNonZeroUpKiBsPerSec = 0;
-    this.lastNonZeroDownKiBsPerSec = 0;
-    this.upTotal = 0;
-    this.downTotal = 0;
-    this.lastUpdateMs = 0;
-    this.lastNonZeroUpdateMs = 0;
-  },
-  note(payload) {
-    this.upKiBsPerSec = payload.up_kibps || 0;
-    this.downKiBsPerSec = payload.down_kibps || 0;
-    if (this.upKiBsPerSec > 0 || this.downKiBsPerSec > 0) {
-      this.lastNonZeroUpKiBsPerSec = this.upKiBsPerSec;
-      this.lastNonZeroDownKiBsPerSec = this.downKiBsPerSec;
-      this.lastNonZeroUpdateMs = performance.now();
-    }
-    this.upTotal = payload.up_total || 0;
-    this.downTotal = payload.down_total || 0;
-    this.lastUpdateMs = performance.now();
-  },
-  fresh(maxAgeMs = 3000) {
-    return this.lastUpdateMs && (performance.now() - this.lastUpdateMs) <= maxAgeMs;
-  },
-  display() {
-    if (this.fresh() && (this.upKiBsPerSec > 0 || this.downKiBsPerSec > 0)) {
-      return `gateway splice ↑${this.upKiBsPerSec.toFixed(1)} ↓${this.downKiBsPerSec.toFixed(1)} KiB/s`;
-    }
-    if (this.lastNonZeroUpdateMs) {
-      return `gateway splice ↑${this.lastNonZeroUpKiBsPerSec.toFixed(1)} ↓${this.lastNonZeroDownKiBsPerSec.toFixed(1)} KiB/s last`;
-    }
-    return 'gateway splice ↑— ↓— KiB/s';
-  },
-};
-bridgeStats.reset();
-window.__whidStats = {
-  snapshot: () => fastStats.snapshot(),
-  reset: () => fastStats.reset(),
-};
-
-const hdlc = new HdlcParser(pkt => {
+const hdlc   = new HdlcParser(pkt => {
   rxCount++;
   enqueuePacket(pkt);
   pendingRxBytes += pkt.length;
 });
-
-function onWsBytes(bytes) {
-  if (transport) {
-    // Fast path: forward raw HDLC bytes straight to the dongle. The byte
-    // counters double-count the WS bytes as "packet-equivalent traffic"
-    // for the activity bars; precise packet counting requires a parse we
-    // deliberately skip in fast mode.
-    transport.sendBytes(bytes);
-    rxCount++;
-    pendingRxBytes += bytes.length;
-    blink(rxDot);
-  } else {
-    hdlc.push(bytes);
-  }
-}
 
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -800,30 +451,15 @@ function connect() {
   ws.onopen  = () => setWsStatus('connected', true);
   ws.onclose = () => { setWsStatus('offline', false); setTimeout(connect, 2500); };
   ws.onerror = () => ws.close();
-  ws.onmessage = e => {
-    if (typeof e.data === 'string') {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg && msg.type === 'splice_stats') {
-          bridgeStats.note(msg);
-        }
-      } catch (_err) {}
-      return;
-    }
-    onWsBytes(new Uint8Array(e.data));
-  };
+  ws.onmessage = e => hdlc.push(new Uint8Array(e.data));
 }
 
 connect();
 
-// ─── HID uplink (standard: textarea keystroke capture) ───────────────────────
+// ─── HID uplink ──────────────────────────────────────────────────────────────
 
 const hidInput = document.getElementById('hid-input');
 const hid      = new HidParser(pkt => {
-  // Suppress standard parse path entirely when fast-path is active. If the
-  // dongle is still typing leftover keystrokes during a transition, dropping
-  // them here is correct — those bytes are already coming in via WebHID.
-  if (transport) return;
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(hdlcEncode(pkt));
     txCount++;
@@ -838,382 +474,10 @@ hidInput.addEventListener('input', () => {
 });
 
 // Keep focus on the input so HID keystrokes are always captured.
-function refocus() {
-  // No point grabbing focus while fast path is active — nothing reads it.
-  if (transport) return;
-  if (document.activeElement !== hidInput) hidInput.focus();
-}
+function refocus() { if (document.activeElement !== hidInput) hidInput.focus(); }
 setInterval(refocus, 250);
 document.addEventListener('click', refocus);
 document.addEventListener('touchstart', refocus);
-
-// ─── WebHID fast-path transport ──────────────────────────────────────────────
-//
-// Vendor-HID device exposed by the ESP32 dongle. Each WebHID report carries
-// 63 data bytes: 1 length byte + up to 62 payload bytes. The payload slices
-// are just the same raw HDLC byte stream that the WebSocket carries.
-
-class WebHidTransport {
-  constructor(device) {
-    this.device = device;
-    this._closed = false;
-    this._sendChain = Promise.resolve();
-    this._configWaiter = null;
-    device.addEventListener('inputreport', e => this._onInputReport(e));
-  }
-
-  static async request() {
-    // Filter by Espressif VID + vendor usage page. Browsers also enforce
-    // their own block on protected usages (keyboard, mouse, gamepad) so a
-    // bare {} filter would still hide the keyboard interface of our
-    // composite device — but explicit filters give the user a clean chooser.
-    const devices = await navigator.hid.requestDevice({
-      filters: [{ vendorId: ESP_VENDOR_ID, usagePage: VENDOR_USAGE_PAGE }],
-    });
-    if (!devices || devices.length === 0) return null;
-    const device = devices[0];
-    if (!device.opened) await device.open();
-    return new WebHidTransport(device);
-  }
-
-  /** Serialize raw bytes toward the dongle so overlapping WS bursts cannot interleave HID reports. */
-  sendBytes(bytes) {
-    if (this._closed || bytes.length === 0) return this._sendChain;
-    const payload = new Uint8Array(bytes);
-    this._sendChain = this._sendChain
-      .then(() => this._sendBytesNow(payload))
-      .catch(err => {
-        console.warn('[webhid] sendReport failed:', err);
-      });
-    return this._sendChain;
-  }
-
-  async _sendBytesNow(bytes) {
-    if (this._closed) return;
-    // Chunk into HID_REPORT_PAYLOAD_MAX-byte slices, length-prefix each.
-    for (let i = 0; i < bytes.length; i += HID_REPORT_PAYLOAD_MAX) {
-      if (this._closed) return;
-      const slice = bytes.subarray(i, i + HID_REPORT_PAYLOAD_MAX);
-      const report = new Uint8Array(HID_REPORT_SIZE);
-      report[0] = slice.length;
-      report.set(slice, 1);
-      await this.device.sendReport(VENDOR_REPORT_ID, report);
-    }
-  }
-
-  async _sendConfigReport(fill) {
-    if (this._closed) throw new Error('Transport is closed');
-    const report = new Uint8Array(CONFIG_REPORT_SIZE);
-    fill(report);
-    await this.device.sendReport(CONFIG_REPORT_ID, report);
-  }
-
-  async readPeerConfig() {
-    if (this._configWaiter) throw new Error('A config request is already in flight');
-    let timeoutId = 0;
-    const response = new Promise((resolve, reject) => {
-      timeoutId = window.setTimeout(() => {
-        if (this._configWaiter && this._configWaiter.reject === reject) {
-          this._configWaiter = null;
-          reject(new Error('Timed out waiting for config response'));
-        }
-      }, 2000);
-      this._configWaiter = {
-        resolve: config => {
-          window.clearTimeout(timeoutId);
-          this._configWaiter = null;
-          resolve(config);
-        },
-        reject: err => {
-          window.clearTimeout(timeoutId);
-          this._configWaiter = null;
-          reject(err);
-        },
-      };
-    });
-    try {
-      await this._sendConfigReport(report => {
-        report[0] = CONFIG_CMD_GET_STATUS;
-      });
-    } catch (err) {
-      if (this._configWaiter) {
-        this._configWaiter.reject(err);
-        this._configWaiter = null;
-      }
-      throw err;
-    }
-    return response;
-  }
-
-  async writePeerConfig(config) {
-    const { mode, ssid, pass } = encodePeerConfig(config);
-    await this._sendConfigReport(report => {
-      report[0] = CONFIG_CMD_STAGE_MODE_SSID;
-      report[1] = mode === 'wifi-ap' ? 1 : 0;
-      report[2] = ssid.length;
-      report.set(ssid, 3);
-    });
-    if (pass.length > 0) {
-      await this._sendConfigReport(report => {
-        report[0] = CONFIG_CMD_STAGE_PASSWORD;
-        report[1] = pass.length;
-        report.set(pass, 2);
-      });
-    }
-    await this._sendConfigReport(report => {
-      report[0] = config.command;
-    });
-  }
-
-  _onInputReport(event) {
-    if (this._closed) return;
-    if (event.reportId === CONFIG_REPORT_ID) {
-      const config = decodePeerConfig(event.data);
-      if (this._configWaiter) this._configWaiter.resolve(config);
-      return;
-    }
-    if (event.reportId !== VENDOR_REPORT_ID) return;
-    const t0 = performance.now();
-    const buf = new Uint8Array(event.data.buffer, event.data.byteOffset, event.data.byteLength);
-    let n = buf[0];
-    if (n > HID_REPORT_PAYLOAD_MAX) n = HID_REPORT_PAYLOAD_MAX;
-    if (n === 0) return;
-    const payload = buf.subarray(1, 1 + n);
-    let sent = false;
-    let bufferedBefore = 0;
-    let bufferedAfter = 0;
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      // Splice straight onto the WebSocket — these bytes are already HDLC
-      // because that's what the laptop client sent through the dongle.
-      bufferedBefore = ws.bufferedAmount;
-      ws.send(payload);
-      bufferedAfter = ws.bufferedAmount;
-      sent = true;
-      txCount++;
-      blink(txDot);
-      pendingTxBytes += payload.length;
-    }
-    fastStats.noteInputReport(payload.length, performance.now() - t0, bufferedBefore, bufferedAfter, sent);
-  }
-
-async close() {
-  this._closed = true;
-  if (this._configWaiter) {
-    this._configWaiter.reject(new Error('Transport closed'));
-    this._configWaiter = null;
-  }
-  try { await this._sendChain; } catch {}
-  try { await this.device.close(); } catch {}
-  }
-}
-
-async function refreshPeerConfigUi(targetTransport = transport) {
-  if (!targetTransport) return;
-  const seq = ++peerConfigRequestSeq;
-  setPeerConfigStatus('Loading peer-link settings…');
-  try {
-    const config = await targetTransport.readPeerConfig();
-    if (seq !== peerConfigRequestSeq || targetTransport !== transport) return;
-    applyPeerConfigToUi(config);
-  } catch (err) {
-    if (seq !== peerConfigRequestSeq) return;
-    setPeerConfigStatus(`Failed to read settings: ${err.message || err}`);
-  }
-}
-
-async function applyPeerConfigFromUi() {
-  if (!transport) return;
-  try {
-    setPeerControlsEnabled(false);
-    await transport.writePeerConfig({
-      command: CONFIG_CMD_APPLY,
-      mode: peerModeSelect.value,
-      ssid: wifiSsidInput.value.trim(),
-      pass: wifiPassInput.value,
-    });
-    setPeerConfigStatus('Settings saved; dongle rebooting. Once rebooted, refresh this page.');
-  } catch (err) {
-    setPeerConfigStatus(`Apply failed: ${err.message || err}`);
-    setPeerControlsEnabled(true);
-  }
-}
-
-async function tryAutoAttachDevice(device) {
-  if (!device || transport) return;
-  const matches = device.vendorId === ESP_VENDOR_ID &&
-    device.collections.some(c => c.usagePage === VENDOR_USAGE_PAGE);
-  if (!matches) return;
-  try {
-    if (!device.opened) await device.open();
-    attachFastTransport(new WebHidTransport(device));
-  } catch (err) {
-    console.warn('[webhid] auto-attach failed:', err);
-  }
-}
-
-const fastBtn      = document.getElementById('fast-btn');
-const webhidArea   = document.getElementById('webhid-area');
-const webhidDevice = document.getElementById('webhid-device');
-const webhidStats  = document.getElementById('webhid-stats');
-const peerModeSelect = document.getElementById('peer-mode-select');
-const wifiSsidRow = document.getElementById('wifi-ssid-row');
-const wifiPassRow = document.getElementById('wifi-pass-row');
-const wifiSsidInput = document.getElementById('wifi-ssid-input');
-const wifiPassInput = document.getElementById('wifi-pass-input');
-const wifiPassToggle = document.getElementById('wifi-pass-toggle');
-const peerApplyBtn = document.getElementById('peer-apply-btn');
-const webhidConfigStatus = document.getElementById('webhid-config-status');
-const qrCanvas     = document.getElementById('qr-canvas');
-let peerConfigRequestSeq = 0;
-
-function setPeerConfigStatus(text) {
-  webhidConfigStatus.textContent = text || '—';
-}
-
-function setPeerControlsEnabled(enabled) {
-  peerModeSelect.disabled = !enabled;
-  wifiSsidInput.disabled = !enabled;
-  wifiPassInput.disabled = !enabled;
-  wifiPassToggle.disabled = !enabled;
-  peerApplyBtn.disabled = !enabled;
-}
-
-function updatePeerModeUi() {
-  const wifi = peerModeSelect.value === 'wifi-ap';
-  wifiSsidRow.hidden = !wifi;
-  wifiPassRow.hidden = !wifi;
-}
-
-function setWifiPasswordVisible(visible) {
-  wifiPassInput.type = visible ? 'text' : 'password';
-  wifiPassToggle.textContent = visible ? 'Hide' : 'Show';
-  wifiPassToggle.setAttribute('aria-pressed', visible ? 'true' : 'false');
-}
-
-function decodePeerConfig(dataView) {
-  const buf = new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
-  const ssidLen = Math.min(buf[4] || 0, CONFIG_WIFI_SSID_MAX);
-  return {
-    version: buf[0] || 0,
-    configuredMode: buf[1] === 1 ? 'wifi-ap' : 'ble',
-    activeMode: buf[2] === 1 ? 'wifi-ap' : 'ble',
-    statusCode: buf[3] || 0,
-    ssid: peerConfigCodec.dec.decode(buf.slice(5, 5 + ssidLen)),
-    flags: buf[61] || 0,
-  };
-}
-
-function encodePeerConfig({ mode, ssid, pass }) {
-  const ssidBytes = peerConfigCodec.enc.encode(ssid);
-  const passBytes = pass ? peerConfigCodec.enc.encode(pass) : new Uint8Array(0);
-  if (ssidBytes.length === 0 || ssidBytes.length > CONFIG_WIFI_SSID_MAX) {
-    throw new Error(`Wi-Fi SSID must be 1-${CONFIG_WIFI_SSID_MAX} bytes`);
-  }
-  if (passBytes.length > 0 && (passBytes.length < 8 || passBytes.length > CONFIG_WIFI_PASS_MAX)) {
-    throw new Error('Wi-Fi password must be 8-63 bytes');
-  }
-  return { mode, ssid: ssidBytes, pass: passBytes };
-}
-
-function applyPeerConfigToUi(config) {
-  peerModeSelect.value = config.configuredMode;
-  wifiSsidInput.value = config.ssid;
-  updatePeerModeUi();
-  const status = CONFIG_STATUS_TEXT[config.statusCode] || `Status ${config.statusCode}`;
-  setPeerConfigStatus(`Configured ${config.configuredMode}; active ${config.activeMode}; ${status}`);
-}
-
-function setFastMode(active, device) {
-  if (active) {
-    fastStats.reset();
-    bridgeStats.reset();
-    webhidArea.classList.add('active');
-    qrCanvas.style.display = 'none';
-    idleMsg.style.display  = 'none';
-    fastBtn.classList.add('active');
-    fastBtn.textContent    = 'Fast ●';
-    webhidDevice.textContent = device ? device.productName || 'HID device' : '—';
-    webhidStats.textContent  = 'measuring…';
-    setPeerControlsEnabled(true);
-    // Drain any QR queue so the standard path doesn't keep displaying.
-    queue.length = 0;
-  } else {
-    webhidArea.classList.remove('active');
-    qrCanvas.style.display = '';
-    fastBtn.classList.remove('active');
-    fastBtn.textContent    = 'Fast';
-    webhidDevice.textContent = '—';
-    webhidStats.textContent  = '—';
-    setPeerControlsEnabled(false);
-    setPeerConfigStatus('');
-  }
-}
-
-setPeerControlsEnabled(false);
-updatePeerModeUi();
-setWifiPasswordVisible(false);
-setPeerConfigStatus('');
-
-function attachFastTransport(nextTransport) {
-  transport = nextTransport;
-  setFastMode(true, nextTransport.device);
-  refreshPeerConfigUi(nextTransport);
-  nextTransport.device.addEventListener('disconnect', () => {
-    if (transport !== nextTransport) return;
-    console.warn('[webhid] device disconnected — falling back to standard');
-    transport = null;
-    setFastMode(false);
-  });
-}
-
-async function connectFastPath() {
-  if (transport) {
-    // Toggle off — disconnect, fall back to standard
-    const t = transport;
-    transport = null;
-    setFastMode(false);
-    await t.close();
-    return;
-  }
-  try {
-    const t = await WebHidTransport.request();
-    if (!t) return;   // user cancelled the chooser
-    attachFastTransport(t);
-  } catch (err) {
-    console.error('[webhid] request failed:', err);
-  }
-}
-
-// Feature detection — only expose the Fast button when WebHID is available
-// AND the page is on a secure context (HTTPS / localhost).
-if ('hid' in navigator && window.isSecureContext) {
-  fastBtn.classList.add('available');
-  fastBtn.addEventListener('click', connectFastPath);
-  peerModeSelect.addEventListener('change', updatePeerModeUi);
-  wifiPassToggle.addEventListener('click', () => {
-    setWifiPasswordVisible(wifiPassInput.type === 'password');
-  });
-  peerApplyBtn.addEventListener('click', applyPeerConfigFromUi);
-  navigator.hid.addEventListener('connect', event => {
-    tryAutoAttachDevice(event.device);
-  });
-  // If the user has previously granted access to this dongle, reattach
-  // automatically. getDevices() returns only devices the page has
-  // permission for and does NOT show a chooser — silent reconnect.
-  navigator.hid.getDevices().then(async devs => {
-    const match = devs.find(d =>
-      d.vendorId === ESP_VENDOR_ID &&
-      d.collections.some(c => c.usagePage === VENDOR_USAGE_PAGE)
-    );
-    if (match) {
-      try {
-        await tryAutoAttachDevice(match);
-      } catch (err) {
-        console.warn('[webhid] auto-reattach failed:', err);
-      }
-    }
-  });
-}
 
 // ─── UI helpers ──────────────────────────────────────────────────────────────
 
@@ -1231,23 +495,11 @@ function setWsStatus(text, ok) {
   wsDot.className    = 'dot' + (ok ? ' on' : ' err');
 }
 
-function updateFastStats() {
-  if (!transport) return;
-  const s = fastStats.snapshot();
-  webhidStats.textContent =
-    `${bridgeStats.display()} | local hid→ws ${s.activeWsKiBsPerSec.toFixed(1)} KiB/s ` +
-    `${s.activeReportsPerSec.toFixed(0)} rpt/s avg ${s.avgPayloadBytes.toFixed(1)} B ` +
-    `gap ${s.reportGapAvgMs.toFixed(2)}/${s.reportGapMaxMs.toFixed(2)} ms ` +
-    `js ${s.handlerAvgMs.toFixed(3)} ms avg/${s.handlerMaxMs.toFixed(3)} max ` +
-    `wsbuf ${s.wsBufferedAfterMax} max`;
-}
-
 function updateUI() {
   rxEl.textContent    = rxCount;
   txEl.textContent    = txCount;
   queueEl.textContent = queue.length;
   seqEl.textContent   = 'seq ' + txSeq.toString(16).padStart(4, '0');
-  updateFastStats();
 }
 
 const blinkTimers = new Map();

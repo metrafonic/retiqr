@@ -13,111 +13,38 @@ Usage:
 import asyncio
 import argparse
 import logging
-from dataclasses import dataclass
 from pathlib import Path
 
 from aiohttp import web, WSMsgType
 
 log = logging.getLogger(__name__)
 
-_WS_TO_TCP_DRAIN_BATCH = 4096
-_STATS_INTERVAL_SECS = 1.0
 
-
-@dataclass
-class SpliceStats:
-    up_total: int = 0
-    down_total: int = 0
-    up_window: int = 0
-    down_window: int = 0
-
-    def note_up(self, n: int) -> None:
-        self.up_total += n
-        self.up_window += n
-
-    def note_down(self, n: int) -> None:
-        self.down_total += n
-        self.down_window += n
-
-    def snapshot(self, interval_secs: float) -> dict[str, float | int | str]:
-        up_kibps = self.up_window / 1024.0 / max(interval_secs, 1e-6)
-        down_kibps = self.down_window / 1024.0 / max(interval_secs, 1e-6)
-        self.up_window = 0
-        self.down_window = 0
-        return {
-            "type": "splice_stats",
-            "up_kibps": up_kibps,
-            "down_kibps": down_kibps,
-            "up_total": self.up_total,
-            "down_total": self.down_total,
-        }
-
-
-async def _pipe_tcp_to_ws(
-    reader: asyncio.StreamReader,
-    ws: web.WebSocketResponse,
-    send_lock: asyncio.Lock,
-    stats: SpliceStats,
-) -> None:
+async def _pipe_tcp_to_ws(reader: asyncio.StreamReader, ws: web.WebSocketResponse) -> None:
     try:
         while True:
             data = await reader.read(4096)
             if not data:
                 break
-            async with send_lock:
-                await ws.send_bytes(data)
-            stats.note_down(len(data))
+            await ws.send_bytes(data)
     except (asyncio.CancelledError, ConnectionResetError):
         pass
     finally:
-        async with send_lock:
-            await ws.close()
+        await ws.close()
 
 
-async def _pipe_ws_to_tcp(
-    ws: web.WebSocketResponse,
-    writer: asyncio.StreamWriter,
-    stats: SpliceStats,
-) -> None:
-    pending = 0
+async def _pipe_ws_to_tcp(ws: web.WebSocketResponse, writer: asyncio.StreamWriter) -> None:
     try:
         async for msg in ws:
             if msg.type == WSMsgType.BINARY:
                 writer.write(msg.data)
-                pending += len(msg.data)
-                if pending >= _WS_TO_TCP_DRAIN_BATCH:
-                    await writer.drain()
-                    stats.note_up(pending)
-                    pending = 0
-            elif msg.type == WSMsgType.TEXT:
-                continue
+                await writer.drain()
             elif msg.type in (WSMsgType.CLOSE, WSMsgType.ERROR):
                 break
     except (asyncio.CancelledError, ConnectionResetError):
         pass
     finally:
-        if pending:
-            try:
-                await writer.drain()
-                stats.note_up(pending)
-            except Exception:
-                pass
         writer.close()
-
-
-async def _push_ws_stats(
-    ws: web.WebSocketResponse,
-    send_lock: asyncio.Lock,
-    stats: SpliceStats,
-) -> None:
-    try:
-        while not ws.closed:
-            await asyncio.sleep(_STATS_INTERVAL_SECS)
-            payload = stats.snapshot(_STATS_INTERVAL_SECS)
-            async with send_lock:
-                await ws.send_json(payload)
-    except (asyncio.CancelledError, ConnectionResetError):
-        pass
 
 
 async def ws_handler(request: web.Request) -> web.WebSocketResponse:
@@ -127,8 +54,6 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
     ws = web.WebSocketResponse()
     await ws.prepare(request)
     log.info("ws connect from %s", request.remote)
-    send_lock = asyncio.Lock()
-    stats = SpliceStats()
 
     try:
         reader, writer = await asyncio.open_connection(host, port)
@@ -138,13 +63,10 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
         await ws.close(code=1011, message=b"tcp connect failed")
         return ws
 
-    tcp_task = asyncio.create_task(_pipe_tcp_to_ws(reader, ws, send_lock, stats))
-    ws_task = asyncio.create_task(_pipe_ws_to_tcp(ws, writer, stats))
-    stats_task = asyncio.create_task(_push_ws_stats(ws, send_lock, stats))
+    tcp_task = asyncio.create_task(_pipe_tcp_to_ws(reader, ws))
+    ws_task = asyncio.create_task(_pipe_ws_to_tcp(ws, writer))
 
-    _, pending = await asyncio.wait(
-        [tcp_task, ws_task, stats_task], return_when=asyncio.FIRST_COMPLETED
-    )
+    _, pending = await asyncio.wait([tcp_task, ws_task], return_when=asyncio.FIRST_COMPLETED)
     for task in pending:
         task.cancel()
         try:
